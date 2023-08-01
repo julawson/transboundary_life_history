@@ -1,0 +1,18 @@
+---
+title: "Model and Analysis"
+author: "Lawson et al."
+date: "2023-08-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# Load necessary packages
+
+
+
+```
+
+
+
+
