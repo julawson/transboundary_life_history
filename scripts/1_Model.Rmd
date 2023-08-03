@@ -7,12 +7,166 @@ output: html_document
 
 ```{r setup, include=FALSE}
 
-# Load necessary packages
+library(optimx)
+library(ggplot2)
+library(dplyr)
+
+```
+
+```{r primary setup}
+
+# Define parameters
+r <- 0.05 # discount rate
+delta <- 1/(1+r)
+theta <- 0 # fraction of fish migrating from patch A to B
+
+# Define the growth function
+f <- function(e) {
+  # Square function as our growth function
+  return(e^2)
+}
+
+# Objective function to maximize - The present value of the total harvest
+harvest_volume <- function(e, x, theta, delta) {
+  # The harvest volume in period t
+  harvest_volume_t <- x[1] - e[1] + x[2] - e[2]
+  
+  # The expected harvest volume in period t+1
+  x_next <- c((1 - theta) * f(e[1]), theta * f(e[1]) + f(e[2]))
+  harvest_volume_t_plus_1 <- x_next[1] - e[1] + x_next[2] - e[2]
+
+  # The total harvest volume, discounted
+  total_harvest_volume <- harvest_volume_t + delta * harvest_volume_t_plus_1
+
+  # We need to return the negative of the harvest volume because the optimizer *minimizes* the function
+  return(-total_harvest_volume)
+}
+
+# Initial fish stocks in patches A and B
+x <- c(100, 100)
+
+# Initial guess at escapement in patches A and B
+e_initial_guess <- c(50, 50)
+
+# Optimize
+opt_result <- optimx(par = e_initial_guess, 
+                     fn = harvest_volume, 
+                     x = x, 
+                     theta = theta, 
+                     delta = delta, 
+                     method = "Nelder-Mead")
+
+# Print the results
+print(opt_result)
+
+# Get optimal escapement from the results
+e_optimal <- opt_result$par
+
+# Simulate the fish population over time
+n_periods <- 50
+history <- data.frame(period = integer(), patch = character(), stock = numeric())
+for (t in 1:n_periods) {
+  history <- rbind(history, data.frame(period = rep(t, 2), patch = c("A", "B"), stock = x))
+  x <- c((1 - theta) * f(e_optimal[1]), theta * f(e_optimal[1]) + f(e_optimal[2]))
+}
+
+# Plot the fish population over time
+ggplot(history, aes(x = period, y = stock, color = patch)) +
+  geom_line() +
+  labs(x = "Period", y = "Fish Stock", color = "Patch", 
+       title = "Fish Stock in Patches A and B Over Time") +
+  theme_minimal()
+
 
 
 
 ```
 
 
+```{r define parameters}
 
+# Growth parameters
+r <- 0.30  # Intrinsic growth rate
+K <- 10000  # Carrying capacity
+
+# Define initial parameters
+x_i <- 1000  # Initial stock in patch i
+x_j <- 1000  # Initial stock in patch j
+h_i <- 10  # Harvest in patch i
+h_j <- 80  # Harvest in patch j
+d_ij <- 0  # Portion of young moving from patch i to patch j
+d_ji <- 0  # Portion of young moving from patch j to patch i
+
+timesteps <- 100  # Number of timesteps to simulate
+
+# Escapement functions
+e_i <- function(x_i, h_i) x_i - h_i
+e_j <- function(x_j, h_j) x_j - h_j
+
+# Growth functions
+g_i <- function(e_i, r, K) (r * e_i * (1 - (e_i / K)))
+g_j <- function(e_j, r, K) (r * e_j * (1 - (e_j / K)))
+
+# Initialize data frame for storing results
+results <- tibble(
+  timestep = integer(),
+  x_i = numeric(),
+  x_j = numeric()
+)
+
+# Run simulation
+for (t in 1:timesteps) {
+  
+  # Step 1. Calculate escapement following harvest
+  e_i_t <- e_i(x_i, h_i)
+  e_j_t <- e_j(x_j, h_j)
+
+  # Calculate new stock of young after growth
+  Y_i <- g_i(e_i_t, r, K)
+  Y_j <- g_j(e_j_t, r, K)
+  
+  # Calculate settlement of young fish that will move to a new patch
+  Y_i_to_j <- Y_i * d_ij
+  Y_j_to_i <- Y_j * d_ji
+  
+  # Growth of adult stock after escapement
+  x_i_mu <- e_i_t + g_i(e_i_t, r, K)
+  x_j_mu <- e_j_t + g_j(e_j_t, r, K)
+  
+  # Update stocks in each patch
+  x_i_new <- x_i_mu + Y_j_to_i 
+  x_j_new <- x_j_mu + Y_i_to_j 
+  
+  # Ensure populations don't go below 0
+  x_i_new <- max(x_i_new, 0)
+  x_j_new <- max(x_j_new, 0)
+  
+  # Save results
+  results <- results %>%
+    add_row(
+      timestep = t,
+      x_i = x_i_new,
+      x_j = x_j_new
+    )
+    
+  # Update the stock
+  x_i <- x_i_new
+  x_j <- x_j_new
+}
+
+plot_data <- results %>%
+  pivot_longer(cols = c(x_i, x_j), names_to = "patch", values_to = "population")
+    
+# Create ggplot for population dynamics
+population_plot <- ggplot(plot_data, aes(x = timestep, y = population, color = patch)) +
+  geom_line() +
+  labs(
+    title = "Fish Population Dynamics in Patches i and j",
+    x = "Timestep",
+    y = "Population",
+    color = "Patch")
+
+population_plot
+
+```
 
