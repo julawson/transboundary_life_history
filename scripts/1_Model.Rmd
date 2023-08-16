@@ -13,6 +13,96 @@ library(dplyr)
 
 ```
 
+```{r single growth rate}
+
+#Levhari and Mirman (1980) and Molina and Costello (2021)
+
+# Parameters
+alpha <- 0.4  
+x_t <- seq(0, 2, by = 0.01)
+
+# Compute x_t+1 values based on x_t values
+x_t_plus_1 <- x_t^alpha
+
+# Create a dataframe to store x_t and x_t_plus_1 values
+df <- data.frame(x_t, x_t_plus_1)
+
+# Create the plot using ggplot2
+ggplot(df, aes(x = x_t, y = x_t_plus_1)) +
+  geom_line(color = "blue") +  
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +   
+  ggtitle(paste("Growth Function Plot with alpha =", alpha)) +
+  xlab("x_t") +
+  ylab("x_t+1") +
+  xlim(0, 2) + ylim(0, 2) +  
+  theme_minimal()
+
+```
+
+```{r single growth rate option 2}
+
+#Growth Function
+x_t_plus_1 <- x_t^alpha
+delta = 0.7
+
+# Define the growth function and its derivative
+f <- function(e) {
+  x_t^alpha
+}
+
+f_prime <- function(e) {
+  r * (1 - 2*e/K)
+}
+
+# Finding the optimal escapement e*
+optimize(function(e) abs(f_prime(e) - 1/delta), interval = c(0, K), maximum = TRUE) -> e_star
+e_star_value <- e_star$maximum
+
+# Generate data for plotting
+e_values <- seq(0, K, by = 10)
+x_next_values <- f(e_values)
+
+# Plotting
+ggplot(data.frame(e_t = e_values, x_t_plus_1 = x_next_values), aes(x = e_t, y = x_t_plus_1)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(aes(x = e_star_value, y = f(e_star_value)), color = "red", size = 3) +
+  geom_hline(yintercept = f(e_star_value), linetype = "dashed", color = "red") +
+  labs(title = "Fish Stock Growth Function", x = expression(e[t]), y = expression(x[t+1]), caption = expression(f_prime(e^"*") == 1/delta)) +
+  theme_minimal()
+
+
+```
+
+```{r multiple growth rates}
+
+# Parameters
+alphas <- seq(0.1, 0.9, by = 0.1)  # Generate a sequence of alpha values
+x_t <- seq(0, 2, by = 0.001)  # Generate a sequence of x_t values
+
+# Create a dataframe to store x_t, x_t+1, and alpha values
+df <- data.frame(
+  x_t = rep(x_t, length(alphas)),
+  alpha = rep(alphas, each = length(x_t))
+)
+
+# Compute x_t+1 values based on x_t and alpha values
+df$x_t_plus_1 <- df$x_t ^ df$alpha
+
+# Create the plot using ggplot2
+ggplot(df, aes(x = x_t, y = x_t_plus_1, group = alpha)) +
+  geom_line(aes(color = as.factor(alpha))) +   # Plots the growth function with different colors for each alpha
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +   # Plots the line x_t = x_t+1
+  facet_wrap(~ alpha) +  # Create separate plots for each alpha value
+  ggtitle("Growth Function Plots") +
+  xlab("x_t") +
+  ylab("x_t+1") +
+  xlim(0, 2) + ylim(0, 2) +   # Limit x and y axes to [0, 2]
+  scale_color_discrete(name = "Alpha Value") +
+  theme_minimal()
+
+```
+
+
 ```{r primary setup}
 
 # Define parameters
