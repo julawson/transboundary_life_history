@@ -1,0 +1,103 @@
+
+
+```{r}
+# Sensitivity analysis around v, gamma, alpha, W, c
+
+# I. Get a baseline dataframe with all the parameters we may want to test. ####
+
+# It is a dataframe because it includes a lot of possible values for v and gamma
+
+baseline = data.frame(beta = beta, 
+                      alpha = alpha, 
+                      gamma = gamma, 
+                      W = W_mid, 
+                      c = c,
+                      v = v,
+                      r = r, 
+                      k = k,
+                      sigma = sigma,
+                      spec = 'baseline', 
+                      transformation = 1)
+
+params_sensitivity = baseline
+
+# II. Define all the parameter values we want to test: ####
+# Important : define those values as COEFFICIENTS to be applied to the variables
+# Little sloppy, but the idea is to make sure all vectors are the same length
+# for storage in dataframe
+v_sens = c( 0.05, .1, .5, .6, .7, .8, 1.2, 1.5)
+gamma_sens = c(0.0001, .01, .1/gamma*beta, .2/gamma*beta, .5/gamma*beta, .8/gamma*beta, .95/gamma*beta, .9999/gamma*beta)
+c_sens = c(0, 2,  5, 8, 10, 15, 20, 50)
+alpha_sens = c(.5, .6, .8, 1.2, 1.4, 1.6, 1.8, 2)
+W_sens = c(W_low/W_mid,W_high/W_mid, 2, 4, 6, NA, NA, NA)
+beta_sens = c(.5, .8, 1.2, 1.5, 1.8, 2, NA, NA)
+# Store into data.frame
+sensitivity_values = data.frame()%>%
+  rbind(v_sens, gamma_sens, c_sens, alpha_sens, W_sens, beta_sens)
+sensitivity_values = cbind(data.frame(c('v', 'gamma', 'c', 'alpha', 'W', 'beta')),
+                           sensitivity_values)
+
+colnames(sensitivity_values) = append(c('var'), c(paste0('val',1:length(W_sens))))
+
+# III. Loop to get the data we want ####
+# Here, loop over names.
+for(name in sensitivity_values$var){
+  dat = baseline
+  to_mult = sensitivity_values %>% subset(var==name) %>% select(-var)%>% unlist()
+  # Take all the values that are non NA we want to transform baseline data with
+  to_mult = to_mult[!is.na(to_mult)]
+
+  # Loop over each value : store data with (i) what variable is modified and
+  # (ii) the values we apply to them
+  for (val in to_mult){
+    
+    dat = baseline
+  
+    idea= as.name(name)
+    dat[[idea]] = dat%>%
+      select(all_of(idea))%>%
+      unlist()*val
+    dat$spec = paste(name)
+    dat$transformation = val
+    params_sensitivity = rbind(params_sensitivity, dat)
+  }
+}
+
+# c and v together
+c_sens = seq(0.1, 15000, by = 100)
+v_sens = seq(0.1,1.5, by = .05)*v
+a = expand_grid(c_sens, v_sens)
+colnames(a) = c('c', 'v')
+
+a = cbind(baseline %>% select(-c('c', 'v', 'spec', 'transformation'))%>% slice(rep(1:n(), each = nrow(a))), a)
+
+a = a %>% mutate(spec = 'c and v', 
+                 transformation = paste(c,' and ', v))
+
+params_sensitivity = rbind(params_sensitivity, a)
+
+# c, v, and gamma together
+c_sens = seq(0.1, 8, by = .2)*c
+v_sens = seq(0.1,1.5, by = .2)*v
+gamma_sens = seq(.1, .9, by = .1)*beta
+a = expand_grid(c_sens, v_sens, gamma_sens)
+colnames(a) = c('c', 'v',"gamma")
+a = cbind(baseline %>% select(-c('c', 'v', 'gamma', 'spec', 'transformation'))%>% slice(rep(1:n(), each = nrow(a))), a)
+a = a %>% mutate(spec = 'c and v and gamma', 
+                 transformation = paste(c,' and ', v, 'and', gamma))
+params_sensitivity = rbind(params_sensitivity, a)
+
+#alpha and gamma together
+alpha_sens = seq(0.8,2,.2)*alpha
+gamma_sens = seq(.1, .95, by = .05)*beta
+a = expand_grid(alpha_sens, gamma_sens)
+colnames(a) = c('alpha',"gamma")
+a = cbind(baseline %>% select(-c('alpha', 'gamma', 'spec', 'transformation'))%>% slice(rep(1:n(), each = nrow(a))), a)
+a = a %>% mutate(spec = 'alpha and gamma', 
+                 transformation = paste(alpha,' and ', gamma))
+params_sensitivity = rbind(params_sensitivity, a)
+
+
+rm(a)
+print(paste0('There are ', nrow(params_sensitivity)," combinations to test" ))
+```
