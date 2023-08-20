@@ -17,61 +17,43 @@ library(dplyr)
 
 #Levhari and Mirman (1980) and Molina and Costello (2021)
 
-# Parameters
-alpha <- 0.4  
-x_t <- seq(0, 2, by = 0.01)
+# Load the required library
+library(ggplot2)
 
-# Compute x_t+1 values based on x_t values
-x_t_plus_1 <- x_t^alpha
+# Parameters for Biological Model
+alpha = 0.7  
+x <- seq(0, 3, by = 0.001)
+h = 0
+e <- (x-h)
+
+# Compute x_t+1 values based on x values
+x_t1 = e^alpha
+
+# Parameters for financial model
+r = 0.3 #discount rate 0.3 normal, 0.7 very high
+delta <- (1/(1+r))
+e_star = 1/delta
+
+e_opt = (1 + r)^(1/alpha)
+e_opt
 
 # Create a dataframe to store x_t and x_t_plus_1 values
-df <- data.frame(x_t, x_t_plus_1)
+df <- data.frame(e, x_t1)
 
 # Create the plot using ggplot2
-ggplot(df, aes(x = x_t, y = x_t_plus_1)) +
+ggplot(df, aes(x = e, y = x_t1)) +
   geom_line(color = "blue") +  
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +   
+  geom_vline(aes(xintercept = e_star), color = "red", linetype = "dashed") +  # Add a vertical line for e_star
+  geom_vline(aes(xintercept = e_opt), color = "green", linetype = "dashed") +  # Add a vertical line for e_opt
   ggtitle(paste("Growth Function Plot with alpha =", alpha)) +
-  xlab("x_t") +
+  xlab("e") +
   ylab("x_t+1") +
-  xlim(0, 2) + ylim(0, 2) +  
-  theme_minimal()
-
-```
-
-```{r single growth rate option 2}
-
-#Growth Function
-x_t_plus_1 <- x_t^alpha
-delta = 0.7
-
-# Define the growth function and its derivative
-f <- function(e) {
-  x_t^alpha
-}
-
-f_prime <- function(e) {
-  r * (1 - 2*e/K)
-}
-
-# Finding the optimal escapement e*
-optimize(function(e) abs(f_prime(e) - 1/delta), interval = c(0, K), maximum = TRUE) -> e_star
-e_star_value <- e_star$maximum
-
-# Generate data for plotting
-e_values <- seq(0, K, by = 10)
-x_next_values <- f(e_values)
-
-# Plotting
-ggplot(data.frame(e_t = e_values, x_t_plus_1 = x_next_values), aes(x = e_t, y = x_t_plus_1)) +
-  geom_line(color = "blue", size = 1) +
-  geom_point(aes(x = e_star_value, y = f(e_star_value)), color = "red", size = 3) +
-  geom_hline(yintercept = f(e_star_value), linetype = "dashed", color = "red") +
-  labs(title = "Fish Stock Growth Function", x = expression(e[t]), y = expression(x[t+1]), caption = expression(f_prime(e^"*") == 1/delta)) +
+  xlim(0, 3) + ylim(0, 3) +  
   theme_minimal()
 
 
 ```
+
 
 ```{r multiple growth rates}
 
