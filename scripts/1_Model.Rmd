@@ -10,19 +10,19 @@ output: html_document
 library(optimx)
 library(ggplot2)
 library(dplyr)
+library(wesanderson)
+library(here)
 
 ```
 
+
 ```{r single growth rate}
 
-#Levhari and Mirman (1980) and Molina and Costello (2021)
-
-# Load the required library
-library(ggplot2)
+# Levhari and Mirman (1980) and Molina and Costello (2021)
 
 # Parameters for Biological Model
-alpha = 0.7  
-x <- seq(0, 3, by = 0.001)
+alpha = 0.4 
+x <- seq(0, 1, by = 0.001)
 h = 0
 e <- (x-h)
 
@@ -32,25 +32,32 @@ x_t1 = e^alpha
 # Parameters for financial model
 r = 0.3 #discount rate 0.3 normal, 0.7 very high
 delta <- (1/(1+r))
-e_star = 1/delta
+
+# Solve for e_star (using new interpretation)
+e_star = (1/delta/alpha)^(1/(alpha-1))
 
 e_opt = (1 + r)^(1/alpha)
-e_opt
+
+# Solve for e_inter (still holds from previous explanation)
+e_inter = (r/alpha)^(1/(alpha-1))
 
 # Create a dataframe to store x_t and x_t_plus_1 values
 df <- data.frame(e, x_t1)
 
 # Create the plot using ggplot2
 ggplot(df, aes(x = e, y = x_t1)) +
-  geom_line(color = "blue") +  
-  geom_vline(aes(xintercept = e_star), color = "red", linetype = "dashed") +  # Add a vertical line for e_star
-  geom_vline(aes(xintercept = e_opt), color = "green", linetype = "dashed") +  # Add a vertical line for e_opt
-  ggtitle(paste("Growth Function Plot with alpha =", alpha)) +
-  xlab("e") +
-  ylab("x_t+1") +
-  xlim(0, 3) + ylim(0, 3) +  
-  theme_minimal()
+  geom_line(color = "#3B9AB2") +  
+  geom_vline(aes(xintercept = e_star), color = "black", linetype = "dashed") +  # Add a vertical line for e_star e_inter
+  geom_text(aes(e_star, 0, label = "e*", hjust = - 1, fontface="bold",family = "Times New Roman", size=5)) +
+  geom_text(aes(0.06, 0, label = "x_it", hjust = 0, fontface="bold",family = "Times New Roman", size=5)) +
+  annotate("rect", xmin = 0, xmax = e_star, ymin = 0, ymax = 1, alpha = .2) +
+  xlab(expression(e[t])) +
+  ylab(expression(x[t+1])) +
+  xlim(0, 1) + ylim(0, 1) +  
+  theme_minimal()+
+  theme(legend.position = "none")
 
+#ggsave(here("visuals","xit_star.jpg"),plot = last_plot())
 
 ```
 
@@ -58,187 +65,94 @@ ggplot(df, aes(x = e, y = x_t1)) +
 ```{r multiple growth rates}
 
 # Parameters
-alphas <- seq(0.1, 0.9, by = 0.1)  # Generate a sequence of alpha values
-x_t <- seq(0, 2, by = 0.001)  # Generate a sequence of x_t values
+r = 0.3 #discount rate 0.3 normal, 0.7 very high
+delta <- (1/(1+r))
 
-# Create a dataframe to store x_t, x_t+1, and alpha values
-df <- data.frame(
-  x_t = rep(x_t, length(alphas)),
-  alpha = rep(alphas, each = length(x_t))
-)
+# Define a range of alpha values
+alpha_values <- seq(0.1, 0.9, by=0.1)
 
-# Compute x_t+1 values based on x_t and alpha values
-df$x_t_plus_1 <- df$x_t ^ df$alpha
+# Function to compute e_star for a given alpha
+compute_e_star <- function(alpha, delta) {
+  return((1/delta/alpha)^(1/(alpha-1)))
+}
 
-# Create the plot using ggplot2
-ggplot(df, aes(x = x_t, y = x_t_plus_1, group = alpha)) +
-  geom_line(aes(color = as.factor(alpha))) +   # Plots the growth function with different colors for each alpha
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +   # Plots the line x_t = x_t+1
-  facet_wrap(~ alpha) +  # Create separate plots for each alpha value
-  ggtitle("Growth Function Plots") +
-  xlab("x_t") +
-  ylab("x_t+1") +
-  xlim(0, 2) + ylim(0, 2) +   # Limit x and y axes to [0, 2]
-  scale_color_discrete(name = "Alpha Value") +
-  theme_minimal()
+# Expand our data frame for each alpha
+x <- seq(0, 1, by = 0.001)
+df <- expand.grid(e = x, alpha = alpha_values)
+df$e_star <- sapply(df$alpha, compute_e_star, delta)
+df$x_t1 <- df$e^df$alpha
 
+
+# Plot
+ggplot(df, aes(x = e, y = x_t1)) +
+  geom_line(aes(color = alpha)) +
+  scale_colour_gradientn(colours = wes_palette(9, name = "Zissou1", type = "continuous")) +
+  geom_vline(aes(xintercept = e_star, color = alpha), linetype = "dashed") +
+  facet_wrap(~(1-alpha), scales = "free_y", ncol = 3) +
+  ggtitle(expression(paste('Growth functions and e* for growth rate 1-', alpha))) +
+  xlab(expression(e[t])) +
+  ylab(expression(x[t+1])) +
+  theme_minimal() +
+  xlim(0, 0.5) + ylim(0, 1) +
+  theme(legend.position = "none")
+
+#ggsave(here("visuals","alphas_minus1_estar.jpg"),plot = last_plot())
 ```
 
+```{r single growth rate with dispersal}
 
-```{r primary setup}
+# Levhari and Mirman (1980) and Molina and Costello (2021)
 
-# Define parameters
-r <- 0.05 # discount rate
-delta <- 1/(1+r)
-theta <- 0 # fraction of fish migrating from patch A to B
+library(ggplot2)
 
-# Define the growth function
-f <- function(e) {
-  # Square function as our growth function
-  return(e^2)
+# Parameters for Biological Model
+alpha = 0.4 
+x <- seq(0, 1, by = 0.001)
+h = 0
+e <- (x-h)
+
+# Compute x_t+1 values based on x values
+x_t1 = e^alpha
+
+# Parameters for financial model
+r = 0.3 #discount rate 0.3 normal, 0.7 very high
+delta <- (1/(1+r))
+
+# Solve for e_star (using new interpretation)
+e_star = (1/delta/alpha)^(1/(alpha-1))
+
+# Create a dataframe to store x_t and x_t_plus_1 values
+df <- data.frame(e, x_t1)
+
+# Create the base plot using ggplot2
+p <- ggplot(df, aes(x = e)) +
+  geom_line(aes(y = x_t1), color = "#3B9AB2") +
+  geom_abline(intercept = 0, slope = 1, color = "#EBCC2A", linetype = "dashed") +  # 45-degree line
+  geom_vline(aes(xintercept = e_star), color = "black", linetype = "dashed") +  # Add a vertical line for e_star e_inter
+  annotate("rect", xmin = 0, xmax = e_star, ymin = 0, ymax = 1, alpha = .2) +
+  xlab(expression(e[t])) +
+  ylab(expression(x[t+1])) +
+  xlim(0, 1) + ylim(0, 1) +  
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Loop through theta values and add each to the plot
+theta_values <- seq(0.1, 0.9, by = 0.1)
+for (theta in theta_values) {
+  new_function_values <- (1-theta) * x_t1
+  df$new_function_values <- new_function_values
+  p <- p + geom_line(data = df, aes(y = new_function_values), color = "#78B7C5", linetype="dashed")
 }
 
-# Objective function to maximize - The present value of the total harvest
-harvest_volume <- function(e, x, theta, delta) {
-  # The harvest volume in period t
-  harvest_volume_t <- x[1] - e[1] + x[2] - e[2]
-  
-  # The expected harvest volume in period t+1
-  x_next <- c((1 - theta) * f(e[1]), theta * f(e[1]) + f(e[2]))
-  harvest_volume_t_plus_1 <- x_next[1] - e[1] + x_next[2] - e[2]
+p + geom_text(aes(1, 0.9, label = "0.1", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.8, label = "0.2", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.7, label = "0.3", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.6, label = "0.4", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.5, label = "0.5", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.4, label = "0.6", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.3, label = "0.7", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.2, label = "0.8", hjust = 0,family = "Times New Roman", size=2)) +
+  geom_text(aes(1, 0.1, label = "0.9", hjust = 0,family = "Times New Roman", size=2))
 
-  # The total harvest volume, discounted
-  total_harvest_volume <- harvest_volume_t + delta * harvest_volume_t_plus_1
-
-  # We need to return the negative of the harvest volume because the optimizer *minimizes* the function
-  return(-total_harvest_volume)
-}
-
-# Initial fish stocks in patches A and B
-x <- c(100, 100)
-
-# Initial guess at escapement in patches A and B
-e_initial_guess <- c(50, 50)
-
-# Optimize
-opt_result <- optimx(par = e_initial_guess, 
-                     fn = harvest_volume, 
-                     x = x, 
-                     theta = theta, 
-                     delta = delta, 
-                     method = "Nelder-Mead")
-
-# Print the results
-print(opt_result)
-
-# Get optimal escapement from the results
-e_optimal <- opt_result$par
-
-# Simulate the fish population over time
-n_periods <- 50
-history <- data.frame(period = integer(), patch = character(), stock = numeric())
-for (t in 1:n_periods) {
-  history <- rbind(history, data.frame(period = rep(t, 2), patch = c("A", "B"), stock = x))
-  x <- c((1 - theta) * f(e_optimal[1]), theta * f(e_optimal[1]) + f(e_optimal[2]))
-}
-
-# Plot the fish population over time
-ggplot(history, aes(x = period, y = stock, color = patch)) +
-  geom_line() +
-  labs(x = "Period", y = "Fish Stock", color = "Patch", 
-       title = "Fish Stock in Patches A and B Over Time") +
-  theme_minimal()
-
-
-
-
+ggsave(here("visuals","disp_thetas.jpg"),plot = last_plot())
 ```
-
-
-```{r define parameters}
-
-# Growth parameters
-r <- 0.30  # Intrinsic growth rate
-K <- 10000  # Carrying capacity
-
-# Define initial parameters
-x_i <- 1000  # Initial stock in patch i
-x_j <- 1000  # Initial stock in patch j
-h_i <- 10  # Harvest in patch i
-h_j <- 80  # Harvest in patch j
-d_ij <- 0  # Portion of young moving from patch i to patch j
-d_ji <- 0  # Portion of young moving from patch j to patch i
-
-timesteps <- 100  # Number of timesteps to simulate
-
-# Escapement functions
-e_i <- function(x_i, h_i) x_i - h_i
-e_j <- function(x_j, h_j) x_j - h_j
-
-# Growth functions
-g_i <- function(e_i, r, K) (r * e_i * (1 - (e_i / K)))
-g_j <- function(e_j, r, K) (r * e_j * (1 - (e_j / K)))
-
-# Initialize data frame for storing results
-results <- tibble(
-  timestep = integer(),
-  x_i = numeric(),
-  x_j = numeric()
-)
-
-# Run simulation
-for (t in 1:timesteps) {
-  
-  # Step 1. Calculate escapement following harvest
-  e_i_t <- e_i(x_i, h_i)
-  e_j_t <- e_j(x_j, h_j)
-
-  # Calculate new stock of young after growth
-  Y_i <- g_i(e_i_t, r, K)
-  Y_j <- g_j(e_j_t, r, K)
-  
-  # Calculate settlement of young fish that will move to a new patch
-  Y_i_to_j <- Y_i * d_ij
-  Y_j_to_i <- Y_j * d_ji
-  
-  # Growth of adult stock after escapement
-  x_i_mu <- e_i_t + g_i(e_i_t, r, K)
-  x_j_mu <- e_j_t + g_j(e_j_t, r, K)
-  
-  # Update stocks in each patch
-  x_i_new <- x_i_mu + Y_j_to_i 
-  x_j_new <- x_j_mu + Y_i_to_j 
-  
-  # Ensure populations don't go below 0
-  x_i_new <- max(x_i_new, 0)
-  x_j_new <- max(x_j_new, 0)
-  
-  # Save results
-  results <- results %>%
-    add_row(
-      timestep = t,
-      x_i = x_i_new,
-      x_j = x_j_new
-    )
-    
-  # Update the stock
-  x_i <- x_i_new
-  x_j <- x_j_new
-}
-
-plot_data <- results %>%
-  pivot_longer(cols = c(x_i, x_j), names_to = "patch", values_to = "population")
-    
-# Create ggplot for population dynamics
-population_plot <- ggplot(plot_data, aes(x = timestep, y = population, color = patch)) +
-  geom_line() +
-  labs(
-    title = "Fish Population Dynamics in Patches i and j",
-    x = "Timestep",
-    y = "Population",
-    color = "Patch")
-
-population_plot
-
-```
-
