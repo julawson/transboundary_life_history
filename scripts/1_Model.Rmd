@@ -106,7 +106,7 @@ ggplot(df, aes(x = e, y = x_t1)) +
 library(ggplot2)
 
 # Parameters for Biological Model
-alpha = 0.8 
+alpha = 0.2 
 x <- seq(0, 1, by = 0.001)
 h = 0
 e <- (x-h)
@@ -144,20 +144,19 @@ for (theta in theta_values) {
   p <- p + geom_line(data = df, aes(y = new_function_values), color = "#78B7C5", linetype="dashed")
 }
 
-p + geom_text(aes(1, 0.9, label = "0.1", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.8, label = "0.2", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.7, label = "0.3", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.6, label = "0.4", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.5, label = "0.5", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.4, label = "0.6", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.3, label = "0.7", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.2, label = "0.8", hjust = 0,family = "Times New Roman", size=2)) +
-  geom_text(aes(1, 0.1, label = "0.9", hjust = 0,family = "Times New Roman", size=2))
-
-p + ggtitle(expression(paste('Slow growing stock: growth rate 1-', alpha, '= 0.2 with dispersal'))) +
+p + geom_text(aes(1, 0.9, label = "0.1", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.8, label = "0.2", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.7, label = "0.3", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.6, label = "0.4", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.5, label = "0.5", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.4, label = "0.6", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.3, label = "0.7", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.2, label = "0.8", hjust = 0,family = "Times New Roman", size=5)) +
+  geom_text(aes(1, 0.1, label = "0.9", hjust = 0,family = "Times New Roman", size=5)) +
+  ggtitle(expression(paste('Slow growing stock: growth rate 1-', alpha, '= 0.8 with dispersal'))) +
   geom_text(aes(e_star, 0, label = "e*", hjust = - 1, fontface="bold",family = "Times New Roman", size=5)) 
 
-#ggsave(here("visuals","low_thetas.jpg"),plot = last_plot())
+#ggsave(here("visuals","high_thetas.jpg"),plot = last_plot())
 ```
 
 ```{r }
