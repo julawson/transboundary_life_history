@@ -106,7 +106,7 @@ ggplot(df, aes(x = e, y = x_t1)) +
 library(ggplot2)
 
 # Parameters for Biological Model
-alpha = 0.4 
+alpha = 0.8 
 x <- seq(0, 1, by = 0.001)
 h = 0
 e <- (x-h)
@@ -127,10 +127,10 @@ df <- data.frame(e, x_t1)
 # Create the base plot using ggplot2
 p <- ggplot(df, aes(x = e)) +
   geom_line(aes(y = x_t1), color = "#3B9AB2") +
-  geom_abline(intercept = 0, slope = 1, color = "#EBCC2A", linetype = "dashed") +  # 45-degree line
+  geom_abline(intercept = 0, slope = 1, color = "#F21A00", linetype = "dashed", size=1) +  # 45-degree line
   geom_vline(aes(xintercept = e_star), color = "black", linetype = "dashed") +  # Add a vertical line for e_star e_inter
   annotate("rect", xmin = 0, xmax = e_star, ymin = 0, ymax = 1, alpha = .2) +
-  xlab(expression(e[t])) +
+  xlab(expression(x[t])) +
   ylab(expression(x[t+1])) +
   xlim(0, 1) + ylim(0, 1) +  
   theme_minimal() +
@@ -154,5 +154,50 @@ p + geom_text(aes(1, 0.9, label = "0.1", hjust = 0,family = "Times New Roman", s
   geom_text(aes(1, 0.2, label = "0.8", hjust = 0,family = "Times New Roman", size=2)) +
   geom_text(aes(1, 0.1, label = "0.9", hjust = 0,family = "Times New Roman", size=2))
 
-ggsave(here("visuals","disp_thetas.jpg"),plot = last_plot())
+p + ggtitle(expression(paste('Slow growing stock: growth rate 1-', alpha, '= 0.2 with dispersal'))) +
+  geom_text(aes(e_star, 0, label = "e*", hjust = - 1, fontface="bold",family = "Times New Roman", size=5)) 
+
+#ggsave(here("visuals","low_thetas.jpg"),plot = last_plot())
 ```
+
+```{r }
+
+# Parameters
+r = 0.3 #discount rate 0.3 normal, 0.7 very high
+delta <- (1/(1+r))
+
+# Define a range of alpha and theta values
+alpha_values <- seq(0.1, 0.9, by=0.1)
+theta_values <- seq(0.1, 0.9, by=0.1)
+
+# Function to compute e_star for a given alpha
+compute_e_star <- function(alpha, delta) {
+  return((1/delta/alpha)^(1/(alpha-1)))
+}
+
+# Expand our data frame for each alpha and theta
+x <- seq(0, 1, by = 0.001)
+df <- expand.grid(e = x, alpha = alpha_values, theta = theta_values)
+df$e_star <- sapply(df$alpha, compute_e_star, delta)
+df$x_t1 <- df$e^df$alpha
+df$theta_function = (1-df$theta) * df$x_t1
+
+# Plot
+ggplot(df, aes(x = e)) +
+  geom_line(aes(y = x_t1, color = alpha)) +
+  geom_line(aes(y = theta_function, linetype = factor(alpha), fill = factor(theta))) + # Add theta lines
+  scale_colour_gradientn(colours = wes_palette(9, name = "Zissou1", type = "continuous")) +
+  geom_vline(aes(xintercept = e_star), color = "black", linetype = "dashed") +
+  geom_abline(intercept = 0, slope = 1, color = "#F21A00", linetype = "dashed", size=1) +  # 45-degree line
+  # Add shaded area for each e_star
+  facet_wrap(~(1-alpha), scales = "free_y", ncol = 3) +
+  ggtitle(expression(paste('Growth functions and e* for growth rate 1-', alpha, ' with dispersal'))) +
+  xlab(expression(e[t])) +
+  ylab(expression(x[t+1])) +
+  theme_minimal() +
+  xlim(0, 1) + ylim(0, 1) +
+  theme(legend.position = "none")
+
+#ggsave(here("visuals","multi_thetas.jpg"),plot = last_plot())
+```
+
