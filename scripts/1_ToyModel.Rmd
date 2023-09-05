@@ -7,24 +7,183 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
 ```
 
-## R Markdown
+## 0. Initial Parameters
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Growth Parameters
 
-```{r cars}
-summary(cars)
+x_a = 70
+h_a = 0
+k_a = 100
+r_a = 0.8
+
+x_b = 20
+h_b = 0
+k_b = 100
+r_b = 0.6
+
+# Movement Parameters
+M_ab = 0.3
+M_ba = 0.2
+M_aa = 1 - M_ab
+M_bb = 1 - M_ba
+D_ab = 0.4
+D_ba = 0.3
+D_aa = 1 - D_ab
+D_bb = 1 - D_ba
+
+# Survival Parameters
+mu_a = 0.7
+mu_b = 0.8
+sigma_a = 0.9
+sigma_b = 0.6
+
 ```
 
-## Including Plots
+## I. Adult Movement
 
-You can also embed plots, for example:
+```{r}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Escapement
+e_a = x_a - h_a
+e_b = x_b - h_b
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## II. Larval Production
+
+```{r}
+
+# Patch-specific population growth Patch A
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+
+# Patch-specific population growth Patch B
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+```
+
+```{r}
+
+result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>%
+  mutate(y_a = growth_a(e_a)) %>% 
+  mutate(y_b = growth_b(e_b))
+
+```
+
+### III. Larval contribution at t+1 including survival
+
+```{r}
+
+new_a = function(y_b = y_b, y_a = y_a, sigma_b.=sigma_b,D_bb. = D_bb, D_ab. = D_ab){
+  a_1_larval =  (sigma_a*(y_a*D_aa + y_b*D_ba))
+  return(a_1_larval)
+}
+
+new_b = function(y_a = y_a, y_b = y_b, sigma_a.=sigma_a, D_aa. = D_aa, D_ba. = D_ba){
+  b_1_larval =  (sigma_b*(y_b*D_bb + y_a*D_ab))
+  return(b_1_larval)
+}
+
+
+result1 = result1 %>% 
+  mutate(a_1_larval = new_a(y_b, y_a)) %>% 
+  mutate(b_1_larval = new_b(y_a, y_b))
+
+```
+
+### IV. Adult contribution at t+1 including survival
+
+```{r}
+
+adult_a = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_bb. = M_bb, M_ab. = M_ab){
+  a_1_adult = (mu_a*(e_a*M_aa) + mu_b*(e_b*M_ba))
+  return(a_1_adult)
+}
+
+adult_b = function(e_a = e_a, e_b = e_b, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_aa, M_ba. = M_ba){
+  b_1_adult = (mu_b*(e_b*M_bb) + mu_a*(e_a*M_ab))
+  return(b_1_adult)
+}
+
+result1 = result1 %>% 
+  mutate(a_1_adult = adult_a(e_b, e_a)) %>% 
+  mutate(b_1_adult = adult_b(e_a, e_b))
+
+```
+
+### V. Full population in next time step
+
+```{r}
+
+result1 = result1 %>% 
+  mutate(a_t1 = a_1_larval + a_1_adult) %>% 
+  mutate(b_t1 = b_1_larval + b_1_adult)
+
+```
+
+
+```{r}
+
+# Figure of Steady States
+
+for_graph = result1
+
+plot_a = for_graph %>%
+  ggplot(aes(x = e_a, 
+             y = a_t1)) +
+  theme_bw() +
+  geom_line(linewidth = 0.7) +
+  geom_abline(slope=1, linetype="dashed", color="red") + # 45 degree line to find steady state
+  geom_vline(aes(xintercept=x_a), linetype="dashed") # initial population, x_a
+
+plot_b = for_graph %>%
+  ggplot(aes(x = e_b, 
+             y = b_t1)) +
+  theme_bw() +
+  geom_line(linewidth = 0.7) +
+  geom_abline(slope=1, linetype="dashed", color="red") + # 45 degree line to find steady state
+  geom_vline(aes(xintercept=x_b), linetype="dashed") #initial population, x_b
+
+plot_a
+plot_b
+```
+
+```{r}
+
+# Table of Steady States
+
+result1 = result1 %>% 
+  mutate(diff_b = b_t1-e_b) %>% 
+  mutate(diff_a = a_t1-e_a)
+
+steady_states = c()
+  
+for(variable in c('diff_a', 'diff_b')){
+  # Find where difference equations change sign
+  ss = which(sign(eval(parse(text = paste0('result1$',variable)))) != lag(sign(eval(parse(text = paste0('result1$', variable))))))
+  if(length(ss)==1){
+      steady_states = append(steady_states, c(result1[ss, 1]))
+  }
+}
+
+final_ = as.data.frame(steady_states) %>% 
+  add_column(patch = c("A","B")) %>% 
+  select(patch,steady_states)
+kable(final_, row.names = F)
+```
+
