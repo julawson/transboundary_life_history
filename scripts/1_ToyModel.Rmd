@@ -36,7 +36,7 @@ M_ab = 0.3
 M_ba = 0.2
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.4
+D_ab = 0.6
 D_ba = 0.3
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
@@ -184,6 +184,6 @@ for(variable in c('diff_a', 'diff_b')){
 final_ = as.data.frame(steady_states) %>% 
   add_column(patch = c("A","B")) %>% 
   select(patch,steady_states)
-kable(final_, row.names = F)
+final_
 ```
 

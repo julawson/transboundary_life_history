@@ -1,0 +1,161 @@
+---
+title: "Toy Model"
+author: "Julia Lawson, UCSB"
+date: "2023-09-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+## 0. Baseline Parameters
+
+## Assuming equal patches with variation in individual parameters
+
+```{r}
+
+# Growth Parameters, patches are the same
+
+x_a = 50
+h_a = 0
+k_a = 100
+r_a = 0.8
+
+x_b = 50
+h_b = 0
+k_b = 100
+r_b = 0.8
+
+# Movement Parameters, patches are the same
+M_ab = 0.2
+M_ba = 0.2
+M_aa = 1 - M_ab
+M_bb = 1 - M_ba
+D_ab = 0.2
+D_ba = 0.2
+D_aa = 1 - D_ab
+D_bb = 1 - D_ba
+
+# Survival Parameters, patches are the same
+mu_a = 0.8
+mu_b = 0.8
+sigma_a = 0.9
+sigma_b = 0.9
+
+```
+
+```{r}
+
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+full_a = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_aa, M_ba. = M_ba, sigma_a.=sigma_a, D_aa. = D_aa, D_ba. = D_ba){
+  a_1 = (mu_a*(e_a*M_aa) + mu_b*(e_b*M_ba)) + (sigma_a*(growth_a(e_a)*D_aa + growth_a(e_b)*D_ba))
+  return(a_1)
+}
+
+full_b = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_bb. = M_bb, M_ab. = M_ab, sigma_b.=sigma_b, D_bb. = D_bb, D_ab. = D_ab){
+  b_1 = (mu_b*(e_b*M_bb) + mu_a*(e_a*M_ab)) + (sigma_b*(growth_b(e_b)*D_bb + growth_b(e_a)*D_ab))
+  return(b_1)
+}
+
+result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>% 
+  mutate(a_1 = full_a(e_a, e_b)) %>% 
+  mutate(b_1 = full_b(e_a, e_b)) %>%
+  mutate(diff_a = a_1-e_a) %>% 
+  mutate(diff_b = b_1-e_b)
+
+```
+
+```{r}
+  
+steady_state_a = which(sign(result1$diff_a) != lag(sign(result1$diff_a)))
+steady_state_b = which(sign(result1$diff_b) != lag(sign(result1$diff_b)))
+
+steady_states = data.frame(steady_state_a, steady_state_b)
+
+```
+
+```{r}
+
+# Empty Data Frame
+all_results <- data.frame(D_ba = numeric(), e_a = numeric(), e_b = numeric(), a_1 = numeric(), b_1 = numeric(), diff_a = numeric())
+
+# Loop through D_ba values
+for(D_ba in seq(0, 1, by = 0.1)){
+  
+  D_bb = 1 - D_ba
+  
+  result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>%
+    mutate(a_1 = full_a(e_a, e_b, D_aa = D_aa, D_ba = D_ba),
+           b_1 = full_b(e_a, e_b, D_bb = D_bb, D_ab = D_ab)) %>%
+    mutate(diff_a = a_1 - e_a,
+           D_ba = D_ba)
+  
+  all_results <- rbind(all_results, result1)
+}
+
+# View the results for each D_ba value
+all_results
+
+```
+
+```{r}
+
+ggplot(all_results, aes(x = e_a, y = a_1, color = as.factor(D_ba))) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Effect of varying D_ba on a_1",
+       x = "e_a",
+       y = "a_1",
+       color = "D_ba") +
+  theme_bw() +
+  theme(legend.position = "right")
+
+```
+
+```{r}
+# Initialize an empty dataframe to collect all results
+all_steady_states <- data.frame()
+
+# Loop through D_ba values
+for(D_ba in seq(0, 1, by = 0.1)){
+  
+  D_ba_current = D_ba
+  D_aa = 1 - D_ba_current
+  D_bb = 1 - D_ba_current
+  
+  result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>% 
+    mutate(a_1 = full_a(e_b = e_b, e_a = e_a, D_aa = D_aa, D_ba = D_ba_current),
+           b_1 = full_b(e_b = e_b, e_a = e_a, D_bb = D_bb, D_ab = D_ba_current)) %>%
+    mutate(diff_a = a_1 - e_a,
+           diff_b = b_1 - e_b,
+           D_ba = D_ba_current) # Adding a column to store the current D_ba
+  
+  steady_state_a = which(sign(result1$diff_a) != lag(sign(result1$diff_a)))
+  steady_state_b = which(sign(result1$diff_b) != lag(sign(result1$diff_b)))
+
+  steady_states = data.frame(D_ba = D_ba_current,
+                             steady_state_a = ifelse(length(steady_state_a) > 0, result1$e_a[steady_state_a], NA),
+                             steady_state_b = ifelse(length(steady_state_b) > 0, result1$e_b[steady_state_b], NA))
+
+  all_steady_states <- rbind(all_steady_states, steady_states)
+}
+
+# View the steady states for each D_ba value
+all_steady_states
+```
