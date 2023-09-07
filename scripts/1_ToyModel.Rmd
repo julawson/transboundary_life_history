@@ -24,20 +24,20 @@ library(reshape2)
 x_a = 70
 h_a = 0
 k_a = 100
-r_a = 0.8
+r_a = 0.6
 
 x_b = 20
 h_b = 0
 k_b = 100
-r_b = 0.6
+r_b = 0.7
 
 # Movement Parameters
-M_ab = 0.4
-M_ba = 0.5
+M_ab = 0.7 # Adult movement A -> B 
+M_ba = 0.6 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.6
-D_ba = 0.7
+D_ab = 0.3 # Larval dispersal A -> B
+D_ba = 0.2 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
