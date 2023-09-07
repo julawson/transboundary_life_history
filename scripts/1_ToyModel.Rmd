@@ -32,12 +32,12 @@ k_b = 100
 r_b = 0.6
 
 # Movement Parameters
-M_ab = 0.3
-M_ba = 0.2
+M_ab = 0.4
+M_ba = 0.5
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
 D_ab = 0.6
-D_ba = 0.3
+D_ba = 0.7
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
@@ -148,16 +148,16 @@ plot_a = for_graph %>%
              y = a_t1)) +
   theme_bw() +
   geom_line(linewidth = 0.7) +
-  geom_abline(slope=1, linetype="dashed", color="red") + # 45 degree line to find steady state
-  geom_vline(aes(xintercept=x_a), linetype="dashed") # initial population, x_a
+  geom_abline(slope=1, linetype="dashed", color="red") #+ # 45 degree line to find steady state
+  #geom_vline(aes(xintercept=x_a), linetype="dashed") # initial population, x_a
 
 plot_b = for_graph %>%
   ggplot(aes(x = e_b, 
              y = b_t1)) +
   theme_bw() +
   geom_line(linewidth = 0.7) +
-  geom_abline(slope=1, linetype="dashed", color="red") + # 45 degree line to find steady state
-  geom_vline(aes(xintercept=x_b), linetype="dashed") #initial population, x_b
+  geom_abline(slope=1, linetype="dashed", color="red") #+ # 45 degree line to find steady state
+  #geom_vline(aes(xintercept=x_b), linetype="dashed") #initial population, x_b
 
 plot_a
 plot_b

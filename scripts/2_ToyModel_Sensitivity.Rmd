@@ -22,7 +22,6 @@ library(reshape2)
 ```{r}
 
 # Growth Parameters, patches are the same
-
 x_a = 50
 h_a = 0
 k_a = 100
@@ -92,8 +91,10 @@ steady_states = data.frame(steady_state_a, steady_state_b)
 
 ```{r}
 
+# D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
+
 # Empty Data Frame
-all_results <- data.frame(D_ba = numeric(), e_a = numeric(), e_b = numeric(), a_1 = numeric(), b_1 = numeric(), diff_a = numeric())
+all_results <- data.frame(D_ba = numeric(), e_a = numeric(), e_b = numeric(), a_1 = numeric(), b_1 = numeric(), diff_a = numeric(), diff_b = numeric())
 
 # Loop through D_ba values
 for(D_ba in seq(0, 1, by = 0.1)){
@@ -104,6 +105,7 @@ for(D_ba in seq(0, 1, by = 0.1)){
     mutate(a_1 = full_a(e_a, e_b, D_aa = D_aa, D_ba = D_ba),
            b_1 = full_b(e_a, e_b, D_bb = D_bb, D_ab = D_ab)) %>%
     mutate(diff_a = a_1 - e_a,
+           diff_b = b_1 - e_b,
            D_ba = D_ba)
   
   all_results <- rbind(all_results, result1)
@@ -116,6 +118,7 @@ all_results
 
 ```{r}
 
+#Plot for Patch A if D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
 ggplot(all_results, aes(x = e_a, y = a_1, color = as.factor(D_ba))) +
   geom_line() +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
@@ -126,17 +129,28 @@ ggplot(all_results, aes(x = e_a, y = a_1, color = as.factor(D_ba))) +
   theme_bw() +
   theme(legend.position = "right")
 
+#Plot for Patch A if D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
+ggplot(all_results, aes(x = e_b, y = b_1, color = as.factor(D_ba))) +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Effect of varying D_ba on b_1",
+       x = "e_b",
+       y = "b_1",
+       color = "D_ba") +
+  theme_bw() +
+  theme(legend.position = "right")
+
 ```
 
 ```{r}
-# Initialize an empty dataframe to collect all results
+# Initialize an empty data frame
 all_steady_states <- data.frame()
 
 # Loop through D_ba values
 for(D_ba in seq(0, 1, by = 0.1)){
   
   D_ba_current = D_ba
-  D_aa = 1 - D_ba_current
+  D_aa = 1 - D_ab
   D_bb = 1 - D_ba_current
   
   result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>% 
@@ -159,3 +173,5 @@ for(D_ba in seq(0, 1, by = 0.1)){
 # View the steady states for each D_ba value
 all_steady_states
 ```
+
+
