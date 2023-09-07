@@ -121,25 +121,26 @@ all_results
 all_results <- all_results %>% drop_na()
 
 #Plot for Patch A if D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
-ggplot(all_results, aes(x = e_a, y = a_1, fill=as.factor(M_ba), color = as.factor(D_ba))) +
+ggplot(all_results, aes(x = e_a, y = a_1, fill=as.factor(D_ba), color = as.factor(M_ba))) +
   geom_line() +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
   labs(title = "Effect of varying D_ba on a_1",
        x = "e_a",
        y = "a_1",
-       color = "D_ba",
-       fill = "M_ba") +
+       color = "M_ba",
+       fill = "D_ba") +
   theme_bw() +
   theme(legend.position = "right")
 
 #Plot for Patch A if D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
-ggplot(all_results, aes(x = e_b, y = b_1, fill=as.factor(M_ba), color = as.factor(D_ba))) +
+ggplot(all_results, aes(x = e_b, y = b_1, fill=as.factor(D_ba), color = as.factor(M_ba))) +
   geom_line() +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
   labs(title = "Effect of varying D_ba on b_1",
        x = "e_b",
        y = "b_1",
-       color = "D_ba") +
+       color = "M_ba",
+       fill = "D_ba") +
   theme_bw() +
   theme(legend.position = "right")
 
@@ -185,7 +186,11 @@ all_steady_states = all_steady_states #%>%
   #drop_na()
   #mutate(mvmt = D_ba + M_ba) #%>% 
   #mutate_all(~replace_na(.,0)) 
-  
+all_steady_states
+```
+
+```{r}
+
 pal <- wes_palette("Zissou1", 21, type = "continuous")
 
 #Plot of steady states for Patch A if D_ba ranges from 0 (no dispersal) to 1 (all larvae move from patch B to patch A)
