@@ -1,0 +1,315 @@
+---
+title: "Toy Model"
+author: "Julia Lawson, UCSB"
+date: "2023-09-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+### Parameters 
+
+```{r}
+
+x_a = 30
+k_a = 100
+r_a = 0.8
+
+x_b = 60
+k_b = 100
+r_b = 0.9
+
+# Movement Parameters
+M_ab = 0.2 # Adult movement A -> B 
+M_ba = 0.1 # Adult movement B -> A
+M_aa = 1 - M_ab
+M_bb = 1 - M_ba
+D_ab = 0.2 # Larval dispersal A -> B
+D_ba = 0.1 # Larval dispersal B -> A
+D_aa = 1 - D_ab
+D_bb = 1 - D_ba
+
+# Survival Parameters
+mu_a = 0.9
+mu_b = 0.8
+sigma_a = 0.9
+sigma_b = 1
+
+timesteps = 100
+
+# Economic Parameters
+p_a = 40
+c_a = 20
+p_b = 30
+c_b = 10
+
+# discount factor
+delta = 0.95
+
+```
+
+### Functions
+
+```{r}
+
+# Calculate marginal profit
+b_a = p_a - c_a
+b_b = p_b - c_b
+
+# Functions
+
+## 0. Escapement Function
+e_a = function(x_a, h_a) {
+  return(x_a - h_a)
+}
+
+e_b = function(x_b, h_b) {
+  return(x_b - h_b)
+}
+
+## 0. Adaptive Escapement Function
+
+adaptive_e = function(x_current, x_other, k_current, k_other) {
+  coefficient_current = x_current / k_current 
+  coefficient_other = x_other / k_other 
+  e_new = (coefficient_current * coefficient_other * x_other) + ((1 - coefficient_current) * k_current) # Escapement from focal patch influenced by how full both patches are (as indicated by coefficients), and the second part of the equation constrains the escapement to the focal patch carrying capacity (so a higher focal coefficient means less escapement because the patch is relatively full)
+  return(e_new)
+}
+
+## I. Larval Growth
+
+# Patch-specific population growth Patch A
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+# Patch-specific population growth Patch B
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+#III. Larval contribution at t+1 including survival
+
+new_a_larval = function(y_b = y_b, y_a = y_a, sigma_b.=sigma_b,D_bb. = D_bb, D_ab. = D_ab){
+  a_1_larval =  (sigma_a*(y_a*D_aa + y_b*D_ba))
+  return(a_1_larval)
+}
+
+new_b_larval = function(y_a = y_a, y_b = y_b, sigma_a.=sigma_a, D_aa. = D_aa, D_ba. = D_ba){
+  b_1_larval =  (sigma_b*(y_b*D_bb + y_a*D_ab))
+  return(b_1_larval)
+}
+
+### IV. Adult contribution at t+1 including survival
+
+new_adult_a = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_bb. = M_bb, M_ab. = M_ab){
+  a_1_adult = (mu_a*(e_a*M_aa) + mu_b*(e_b*M_ba))
+  return(a_1_adult)
+}
+
+new_adult_b = function(e_a = e_a, e_b = e_b, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_aa, M_ba. = M_ba){
+  b_1_adult = (mu_b*(e_b*M_bb) + mu_a*(e_a*M_ab))
+  return(b_1_adult)
+}
+
+```
+
+```{r model}
+
+# Number of timesteps
+timesteps <- 100
+
+# Initialize data frames for storing results
+results_so <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_star_a = numeric(), e_star_b = numeric()
+)
+
+results_non <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_hat_a = numeric(), e_hat_b = numeric()
+)
+
+results_adaptive <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_new_a = numeric(), e_new_b = numeric()
+)
+
+for(t in 1:timesteps) {
+  # SOLE OWNER ESCAPEMENT
+  
+  # Calculate phi_a and phi_b for e_star
+  phi_a <- (b_a/delta - b_a*mu_a*M_aa - b_b*mu_a*M_ab) / 
+                   (b_a*sigma_a*D_aa + b_b*sigma_b*D_ab)
+  phi_b <- (b_b/delta - b_b*mu_b*M_bb - b_a*mu_b*M_ba) / 
+                   (b_b*sigma_b*D_bb + b_a*sigma_a*D_ba)
+  
+  # Calculate e_star_a and e_star_b
+  e_star_a <- (k_a * (r_a - phi_a)) / (2 * r_a)
+  e_star_b <- (k_b * (r_b - phi_b)) / (2 * r_b)
+  
+  # Calculate harvest based on e_star
+  h_a = x_a - e_star_a
+  h_b = x_b - e_star_b
+  
+  # Escapement
+  e_a_t = e_a(x_a, h_a)
+  e_b_t = e_b(x_b, h_b)
+  
+  # Larval production
+  y_a_t = growth_a(e_a_t)
+  y_b_t = growth_b(e_b_t)
+  
+  # Larval contribution t+1
+  a_t1_larval = new_a_larval(y_a = y_a_t, y_b = y_b_t)
+  b_t1_larval = new_b_larval(y_b = y_b_t, y_a = y_a_t)
+  
+  # Adult contribution t+1
+  a_t1_adult = new_adult_a(e_a = e_a_t, e_b = e_b_t)
+  b_t1_adult = new_adult_b(e_a = e_a_t, e_b = e_b_t)
+  
+  # Update stocks in each patch
+  x_a_new = a_t1_larval + a_t1_adult
+  x_b_new = b_t1_larval + b_t1_adult
+  
+  # Save results including e_star_a and e_star_b
+  results_so <- results_so %>%
+    add_row(
+      timestep = t,
+      x_a = x_a_new,
+      x_b = x_b_new,
+      h_a = h_a,
+      h_b = h_b,
+      e_star_a = e_star_a,
+      e_star_b = e_star_b)
+    
+  # Update the stock for next iteration
+  x_a <- x_a_new
+  x_b <- x_b_new
+  
+  # NON-COOPERATIVE ESCAPEMENT
+  
+  # Calculate phi_hat_a and phi_hat_b for e_hat
+  phi_hat_a <- (1/delta - mu_a*M_aa) / (sigma_a*D_aa)
+  phi_hat_b <- (1/delta - mu_b*M_bb) / (sigma_b*D_bb)
+  
+  # Calculate e_hat_a and e_hat_b
+  e_hat_a <- (k_a * (r_a - phi_hat_a)) / (2 * r_a)
+  e_hat_b <- (k_b * (r_b - phi_hat_b)) / (2 * r_b)
+  
+  # Calculate harvest based on e_hat
+  h_a = x_a - e_hat_a
+  h_b = x_b - e_hat_b
+  
+  # Escapement
+  e_a_t = x_a - h_a
+  e_b_t = x_b - h_b
+  
+  # Larval production
+  y_a_t = growth_a(e_a_t, k_a, r_a)
+  y_b_t = growth_b(e_b_t, k_b, r_b)
+  
+  # Larval contribution t+1
+  a_t1_larval = new_a_larval(y_b = y_b_t, y_a = y_a_t)
+  b_t1_larval = new_b_larval(y_a = y_a_t, y_b = y_b_t)
+  
+  # Adult contribution t+1
+  a_t1_adult = new_adult_a(e_b = e_b_t, e_a = e_a_t)
+  b_t1_adult = new_adult_b(e_a = e_a_t, e_b = e_b_t)
+  
+  # Update stocks in each patch
+  x_a_new = a_t1_larval + a_t1_adult
+  x_b_new = b_t1_larval + b_t1_adult
+  
+  # Save results including e_hat_a and e_hat_b
+  results_non <- results_non %>%
+    add_row(
+      timestep = t,
+      x_a = x_a_new,
+      x_b = x_b_new,
+      h_a = h_a,
+      h_b = h_b,
+      e_hat_a = e_hat_a,
+      e_hat_b = e_hat_b)
+    
+  # Update the stock
+  x_a <- x_a_new
+  x_b <- x_b_new
+  
+  # ADAPTIVE ESCAPEMENT
+  
+  # Calculate e_new_a and e_new_b based on current stock levels
+  e_new_a = adaptive_e(x_a, x_b, k_a)
+  e_new_b = adaptive_e(x_b, x_a, k_b)
+  
+  # Calculate harvest based on e_new
+  h_a = x_a - e_new_a
+  h_b = x_b - e_new_b
+  
+  # Escapement and Larval production using the existing functions
+  e_a_t = x_a - h_a
+  e_b_t = x_b - h_b
+  
+  y_a_t = growth_a(e_a_t, k_a, r_a)
+  y_b_t = growth_b(e_b_t, k_b, r_b)
+  
+  # Larval contribution t+1
+  a_t1_larval = new_a_larval(y_b = y_b_t, y_a = y_a_t)
+  b_t1_larval = new_b_larval(y_a = y_a_t, y_b = y_b_t)
+  
+  # Adult contribution t+1
+  a_t1_adult = new_adult_a(e_b = e_b_t, e_a = e_a_t)
+  b_t1_adult = new_adult_b(e_a = e_a_t, e_b = e_b_t)
+  
+  # Update stocks in each patch for the third scenario
+  x_a_new = a_t1_larval + a_t1_adult
+  x_b_new = b_t1_larval + b_t1_adult
+  
+  # Save results including e_new_a and e_new_b
+  results_adaptive <- results_adaptive %>%
+    add_row(
+      timestep = t,
+      x_a = x_a_new,
+      x_b = x_b_new,
+      h_a = h_a,
+      h_b = h_b,
+      e_new_a = e_new_a,
+      e_new_b = e_new_b)
+    
+  # Update the stock for next iteration
+  x_a <- x_a_new
+  x_b <- x_b_new
+  
+}
+
+# Calculate Present Value for Each Patch
+
+tpv_so = results_so %>%
+  summarise(patch_a = sum(b_a * (x_a - e_star_a) * delta^(timestep-1)),
+            patch_b = sum(b_b * (x_b - e_star_b) * delta^(timestep-1))) %>% 
+  mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
+  add_column(scenario = "sole owner")
+
+tpv_non = results_non %>%
+  summarise(patch_a = sum(b_a * (x_a - e_hat_a) * delta^(timestep-1)),
+            patch_b = sum(b_b * (x_b - e_hat_b) * delta^(timestep-1))) %>%
+  mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
+  add_column(scenario = "non-coop")
+
+tpv_adaptive = results_adaptive %>%
+  summarise(patch_a = sum(b_a * (x_a - e_new_a) * delta^(timestep-1)),
+            patch_b = sum(b_b * (x_b - e_new_b) * delta^(timestep-1))) %>%
+  mutate(joint_payoff=sum(patch_a+patch_b)) %>%
+  add_column(scenario = "adaptive")
+
+tpv_compare = bind_rows(tpv_so, tpv_non, tpv_adaptive)
+print(tpv_compare)
+
+
+```

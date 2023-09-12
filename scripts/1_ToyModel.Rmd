@@ -36,8 +36,8 @@ M_ab = 0.7 # Adult movement A -> B
 M_ba = 0.6 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.3 # Larval dispersal A -> B
-D_ba = 0.2 # Larval dispersal B -> A
+D_ab = 0.2 # Larval dispersal A -> B
+D_ba = 0.3 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
@@ -187,3 +187,65 @@ final_ = as.data.frame(steady_states) %>%
 final_
 ```
 
+### Economic Model
+
+```{r}
+
+p_a = 40
+c_a = 20
+p_b = 30
+c_b = 10
+
+# discount factor
+delta = 0.95
+
+# Calculate marginal profit
+b_a = p_a - c_a
+b_b = p_b - c_b
+
+```
+
+### I. Sole Owner Solution
+
+```{r}
+
+# Calculate phi_a and phi_b
+phi_a <- (b_a/delta - b_a*mu_a*M_aa - b_b*mu_a*M_ab) / 
+                 (b_a*sigma_a*D_aa + b_b*sigma_b*D_ab)
+
+phi_b <- (b_b/delta - b_b*mu_b*M_bb - b_a*mu_b*M_ba) / 
+                 (b_b*sigma_b*D_bb + b_a*sigma_a*D_ba)
+
+# Calculate e_star_a and e_star_b
+e_star_a <- (k_a * (r_a - phi_a)) / (2 * r_a)
+e_star_b <- (k_b * (r_b - phi_b)) / (2 * r_b)
+
+final_ = mutate(final_, e_star = c(e_star_a, e_star_b))
+
+```
+
+### II. Non-cooperative Solution
+
+```{r}
+
+phi_hat_a <- (1/delta - mu_a*M_aa) / (sigma_a*D_aa)
+phi_hat_b <- (1/delta - mu_b*M_bb) / (sigma_b*D_bb)
+
+e_hat_a <- (k_a * (r_a - phi_hat_a)) / (2 * r_a)
+e_hat_b <- (k_b * (r_b - phi_hat_b)) / (2 * r_b)
+
+final_ = mutate(final_, e_hat = c(e_hat_a, e_hat_b))
+
+```
+
+### III. Plots with sole owner solution (e_star) and non-cooperative solution (e_hat)
+
+```{r}
+
+plot_a + geom_vline(aes(xintercept=e_star_a), color="purple", linetype="dashed") +
+  geom_vline(aes(xintercept=e_hat_a), color="green", linetype="dashed")
+
+plot_b + geom_vline(aes(xintercept=e_star_b), color="purple", linetype="dashed") +
+  geom_vline(aes(xintercept=e_hat_b), color="green", linetype="dashed")
+
+```
