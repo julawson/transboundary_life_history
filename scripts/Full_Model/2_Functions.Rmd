@@ -1,0 +1,81 @@
+---
+title: "Functions"
+author: "Julia Lawson, UCSB"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+```{r}
+
+# Calculate marginal profit
+b_a = p_a - c_a
+b_b = p_b - c_b
+
+# Functions
+
+## 0. Escapement Function
+e_a = function(x_a, h_a) {
+  return(x_a - h_a)
+}
+
+e_b = function(x_b, h_b) {
+  return(x_b - h_b)
+}
+
+## 0. Adaptive Escapement Function
+
+adaptive_e = function(x_current, x_other, k_current, k_other) {
+  coefficient_current = x_current / k_current 
+  coefficient_other = x_other / k_other 
+  e_new = (coefficient_current * coefficient_other * x_other) + ((1 - coefficient_current) * k_current) # Escapement from focal patch influenced by how full both patches are (as indicated by coefficients), and the second part of the equation constrains the escapement to the focal patch carrying capacity (so a higher focal coefficient means less escapement because the patch is relatively full)
+  return(e_new)
+}
+
+## I. Larval Growth
+
+# Patch-specific population growth Patch A
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+# Patch-specific population growth Patch B
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+#III. Larval contribution at t+1 including survival
+
+new_a_larval = function(y_b = y_b, y_a = y_a, sigma_b.=sigma_b,D_bb. = D_bb, D_ab. = D_ab){
+  a_1_larval =  (sigma_a*(y_a*D_aa + y_b*D_ba))
+  return(a_1_larval)
+}
+
+new_b_larval = function(y_a = y_a, y_b = y_b, sigma_a.=sigma_a, D_aa. = D_aa, D_ba. = D_ba){
+  b_1_larval =  (sigma_b*(y_b*D_bb + y_a*D_ab))
+  return(b_1_larval)
+}
+
+### IV. Adult contribution at t+1 including survival
+
+new_adult_a = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_bb. = M_bb, M_ab. = M_ab){
+  a_1_adult = (mu_a*(e_a*M_aa) + mu_b*(e_b*M_ba))
+  return(a_1_adult)
+}
+
+new_adult_b = function(e_a = e_a, e_b = e_b, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_aa, M_ba. = M_ba){
+  b_1_adult = (mu_b*(e_b*M_bb) + mu_a*(e_a*M_ab))
+  return(b_1_adult)
+}
+
+```

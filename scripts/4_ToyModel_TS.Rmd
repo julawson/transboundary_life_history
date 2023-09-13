@@ -5,6 +5,8 @@ date: "2023-09-04"
 output: html_document
 ---
 
+### Toy Model time series with sole owner and non-cooperative scenarios.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -24,31 +26,31 @@ x_a = 30
 k_a = 100
 r_a = 0.8
 
-x_b = 60
+x_b = 30
 k_b = 100
-r_b = 0.9
+r_b = 0.8
 
 # Movement Parameters
 M_ab = 0.2 # Adult movement A -> B 
-M_ba = 0.1 # Adult movement B -> A
+M_ba = 0.2 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.2 # Larval dispersal A -> B
-D_ba = 0.1 # Larval dispersal B -> A
+D_ab = 0.1 # Larval dispersal A -> B
+D_ba = 0.2 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
 # Survival Parameters
 mu_a = 0.9
-mu_b = 0.8
+mu_b = 0.9
 sigma_a = 0.9
-sigma_b = 1
+sigma_b = 0.9
 
 timesteps = 100
 
 # Economic Parameters
-p_a = 40
-c_a = 20
+p_a = 30
+c_a = 10
 p_b = 30
 c_b = 10
 
@@ -215,12 +217,12 @@ for(t in 1:timesteps) {
   y_b_t = growth_b(e_b_t, k_b, r_b)
   
   # Larval contribution t+1
-  a_t1_larval = new_a(y_b = y_b_t, y_a = y_a_t)
-  b_t1_larval = new_b(y_a = y_a_t, y_b = y_b_t)
+  a_t1_larval = new_a_larval(y_b = y_b_t, y_a = y_a_t)
+  b_t1_larval = new_b_larval(y_a = y_a_t, y_b = y_b_t)
   
   # Adult contribution t+1
-  a_t1_adult = adult_a(e_b = e_b_t, e_a = e_a_t)
-  b_t1_adult = adult_b(e_a = e_a_t, e_b = e_b_t)
+  a_t1_adult = new_adult_a(e_b = e_b_t, e_a = e_a_t)
+  b_t1_adult = new_adult_b(e_a = e_a_t, e_b = e_b_t)
   
   # Update stocks in each patch
   x_a_new = a_t1_larval + a_t1_adult
@@ -254,13 +256,15 @@ print(results_non)
 tpv_so = results_so %>%
   summarise(patch_a = sum(b_a * (x_a - e_star_a) * delta^(timestep-1)),
             patch_b = sum(b_b * (x_b - e_star_b) * delta^(timestep-1))) %>% 
+  mutate(joint_payoff=sum(patch_a+patch_b)) %>%
   add_column(scenario = "sole owner")
 
 tpv_non = results_non %>%
   summarise(patch_a = sum(b_a * (x_a - e_hat_a) * delta^(timestep-1)),
-            patch_b = sum(b_b * (x_b - e_hat_b) * delta^(timestep-1))) %>% 
+            patch_b = sum(b_b * (x_b - e_hat_b) * delta^(timestep-1))) %>%
+  mutate(joint_payoff=sum(patch_a+patch_b)) %>%
   add_column(scenario = "non-coop")
 
 tpv_compare = bind_rows(tpv_so, tpv_non)
-
+tpv_compare
 ```

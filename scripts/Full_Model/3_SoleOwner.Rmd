@@ -1,0 +1,24 @@
+---
+title: "Sole Owner Scenario"
+author: "Julia Lawson, UCSB"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+# I. Load Parameters
+
+```{r}
+
+params = read.csv(here("data", "inputs", "base_parameters.csv"))
+
+```

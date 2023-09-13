@@ -1,0 +1,122 @@
+---
+title: "Toy Model"
+author: "Julia Lawson, UCSB"
+date: "2023-09-04"
+output: html_document
+---
+
+### Experimenting with some visuals
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+### Parameters 
+
+```{r}
+
+x_a = 30
+k_a = 100
+r_a = 0.8
+
+x_b = 60
+k_b = 100
+r_b = 0.9
+
+# Movement Parameters
+M_ab = 0.2 # Adult movement A -> B 
+M_ba = 0.1 # Adult movement B -> A
+M_aa = 1 - M_ab
+M_bb = 1 - M_ba
+D_ab = 0.2 # Larval dispersal A -> B
+D_ba = 0.3 # Larval dispersal B -> A
+D_aa = 1 - D_ab
+D_bb = 1 - D_ba
+
+# Survival Parameters
+mu_a = 0.9
+mu_b = 0.8
+sigma_a = 0.9
+sigma_b = 1
+
+timesteps = 100
+
+# Economic Parameters
+p_a = 40
+c_a = 20
+p_b = 30
+c_b = 10
+
+# discount factor
+delta = 0.95
+
+```
+
+## 1. Growth Curves for Patch A and B
+
+```{r}
+
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+full_a = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_aa, M_ba. = M_ba, sigma_a.=sigma_a, D_aa. = D_aa, D_ba. = D_ba){
+  a_1 = (mu_a*(e_a*M_aa) + mu_b*(e_b*M_ba)) + (sigma_a*(growth_a(e_a)*D_aa + growth_a(e_b)*D_ba))
+  return(a_1)
+}
+
+full_b = function(e_b = e_b, e_a = e_a, mu_a.=mu_a, mu_b.=mu_b, M_bb. = M_bb, M_ab. = M_ab, sigma_b.=sigma_b, D_bb. = D_bb, D_ab. = D_ab){
+  b_1 = (mu_b*(e_b*M_bb) + mu_a*(e_a*M_ab)) + (sigma_b*(growth_b(e_b)*D_bb + growth_b(e_a)*D_ab))
+  return(b_1)
+}
+
+result1 = data.frame(e_a = seq(1,k_a), e_b = seq(1,k_b)) %>% 
+  mutate(a_1 = full_a(e_a, e_b)) %>% 
+  mutate(b_1 = full_b(e_a, e_b)) %>%
+  mutate(diff_a = a_1-e_a) %>% 
+  mutate(diff_b = b_1-e_b)
+
+steady_state_a = which(sign(result1$diff_a) != lag(sign(result1$diff_a)))
+steady_state_b = which(sign(result1$diff_b) != lag(sign(result1$diff_b)))
+
+steady_states = data.frame(steady_state_a, steady_state_b)
+
+```
+
+
+```{r}
+
+for_graph = result1 # Need to remember to change input parameters as needed to get growth curves to correspond with e_hat and e_star
+
+vals = read.csv(here("data","vals_compare.csv")) %>% select(-X) %>% 
+  mutate(patch_b = replace(patch_b, which(patch_b<0), NA)) %>% 
+  mutate(patch_a = replace(patch_a, which(patch_a<0), NA))
+
+# Combined plot
+
+plot = ggplot() +
+  geom_line(data=for_graph, aes(x = e_a, y = a_1),linewidth = 0.7, color="purple") +
+  geom_vline(data=vals, aes(xintercept=patch_a[1]), linetype="dotted", color="purple") + # Dotted are the sole owner solution
+  geom_vline(data=vals, aes(xintercept=patch_a[2]), linetype="dashed", color="purple") +
+  geom_line(data=for_graph, aes(x = e_b, y = b_1),linewidth = 0.7, color="blue") +
+  geom_vline(data=vals, aes(xintercept=patch_b[1]), linetype="dotted", color="blue") + # Dashed are the non-cooperative solution
+  geom_vline(data=vals, aes(xintercept=patch_b[2]), linetype="dashed", color="blue") +
+  geom_abline(slope=1, linetype="dashed", color="black") +
+  ylab('Population size in time t+1') +
+  xlab('Population size in time t') +
+  theme_bw() 
+plot
+
+```

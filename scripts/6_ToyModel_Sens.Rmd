@@ -5,7 +5,7 @@ date: "2023-09-04"
 output: html_document
 ---
 
-### Adding 'adaptive escapement' scenario into the Toy Model time series.
+### Varying one parameter (D_ba) from 0 to 1 in increments of 0.1, storing results for all three e_ scenarios.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -35,7 +35,7 @@ M_ba = 0.1 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
 D_ab = 0.2 # Larval dispersal A -> B
-D_ba = 0.3 # Larval dispersal B -> A
+D_ba = 0.1 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
@@ -55,6 +55,9 @@ c_b = 10
 
 # discount factor
 delta = 0.95
+
+# Number of timesteps
+timesteps <- 100
 
 ```
 
@@ -127,9 +130,6 @@ new_adult_b = function(e_a = e_a, e_b = e_b, mu_a.=mu_a, mu_b.=mu_b, M_aa. = M_a
 
 ```{r model}
 
-# Number of timesteps
-timesteps <- 100
-
 # Initialize data frames for storing results
 results_so <- tibble(
   timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_star_a = numeric(), e_star_b = numeric()
@@ -142,6 +142,14 @@ results_non <- tibble(
 results_adaptive <- tibble(
   timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_new_a = numeric(), e_new_b = numeric()
 )
+
+tpv_compare <- tibble()
+
+# Loop over D_ba values
+D_ba_values <- seq(0, 1, by=0.1)
+
+for (D_ba in D_ba_values) {
+  D_bb = 1 - D_ba 
 
 for(t in 1:timesteps) {
   # SOLE OWNER ESCAPEMENT
@@ -289,46 +297,31 @@ for(t in 1:timesteps) {
   x_b <- x_b_new
   
 }
-
-# Calculate Present Value for Each Patch
+  # Calculate Present Value for Each Patch
 
 tpv_so = results_so %>%
-  summarise(patch_a = sum(b_a * (x_a - e_star_a) * delta^(timestep-1)),
-            patch_b = sum(b_b * (x_b - e_star_b) * delta^(timestep-1))) %>% 
-  mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
-  add_column(scenario = "sole owner")
+    summarise(patch_a = sum(b_a * (x_a - e_star_a) * delta^(timestep-1)),
+              patch_b = sum(b_b * (x_b - e_star_b) * delta^(timestep-1))) %>% 
+    mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
+    add_column(scenario = "sole owner", D_ba=D_ba)
 
-tpv_non = results_non %>%
-  summarise(patch_a = sum(b_a * (x_a - e_hat_a) * delta^(timestep-1)),
-            patch_b = sum(b_b * (x_b - e_hat_b) * delta^(timestep-1))) %>%
-  mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
-  add_column(scenario = "non-coop")
+  tpv_non = results_non %>%
+    summarise(patch_a = sum(b_a * (x_a - e_hat_a) * delta^(timestep-1)),
+              patch_b = sum(b_b * (x_b - e_hat_b) * delta^(timestep-1))) %>%
+    mutate(joint_payoff=sum(patch_a+patch_b)) %>% 
+    add_column(scenario = "non-coop", D_ba=D_ba)
 
-tpv_adaptive = results_adaptive %>%
-  summarise(patch_a = sum(b_a * (x_a - e_new_a) * delta^(timestep-1)),
-            patch_b = sum(b_b * (x_b - e_new_b) * delta^(timestep-1))) %>%
-  mutate(joint_payoff=sum(patch_a+patch_b)) %>%
-  add_column(scenario = "adaptive")
+  tpv_adaptive = results_adaptive %>%
+    summarise(patch_a = sum(b_a * (x_a - e_new_a) * delta^(timestep-1)),
+              patch_b = sum(b_b * (x_b - e_new_b) * delta^(timestep-1))) %>%
+    mutate(joint_payoff=sum(patch_a+patch_b)) %>%
+    add_column(scenario = "adaptive", D_ba=D_ba)
 
-tpv_compare = bind_rows(tpv_so, tpv_non, tpv_adaptive)
+  tpv_temp <- bind_rows(tpv_so, tpv_non, tpv_adaptive)  # Temporary results for current D_ba value
+  tpv_compare <- bind_rows(tpv_compare, tpv_temp)  # Appending to the overall results
+}
+
 print(tpv_compare)
 
-# Create Dataframe of e_star, e_hat, and e_adaptive
-
-vals_so = results_so %>% 
-  distinct(e_star_a,e_star_b) %>% 
-  add_column(scenario = "sole owner") %>% 
-  rename("patch_a"="e_star_a",
-         "patch_b"="e_star_b")
-
-vals_non = results_non %>% 
-  distinct(e_hat_a,e_hat_b) %>% 
-  add_column(scenario = "non-coop") %>% 
-  rename("patch_a"="e_hat_a",
-         "patch_b"="e_hat_b")
-
-vals_compare = bind_rows(vals_so, vals_non)
-
-#write.csv(vals_compare, here("data","vals_compare.csv"))
-
 ```
+
