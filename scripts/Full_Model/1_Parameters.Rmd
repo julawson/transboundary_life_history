@@ -15,6 +15,8 @@ library(stargazer)
 library(reshape2)
 ```
 
+# Single set of parameters
+
 ```{r}
 
 x_a = 30
@@ -55,5 +57,41 @@ delta = 0.95
 params = c('x_a','k_a','r_a','x_b','k_b','r_b','M_ab','M_ba','M_aa','M_bb','D_ab','D_ba','D_aa','D_bb','mu_a','mu_b','sigma_a','sigma_b','timesteps','p_a','c_a','p_b','c_b','delta')
 
 write.csv(params, here("data","inputs","base_parameters.csv"))
+
+```
+
+### Parameter Sensitivity Analysis
+
+```{r }
+
+# Sensitivity scenario I. Movement
+
+# First, generate the sequences:
+M_ab_sens <- seq(0.1, 0.9, by=0.1)
+M_ba_sens <- seq(0.1, 0.9, by=0.1)
+D_ab_sens <- seq(0.1, 0.9, by=0.1)
+D_ba_sens <- seq(0.1, 0.9, by=0.1)
+
+# Initialize the data frame to hold the results:
+sensitivity_mvmt <- data.frame()
+
+# Nested for loop to produce combinations:
+for (mab in M_ab_sens) {
+  for (mba in M_ba_sens) {
+    for (dab in D_ab_sens) {
+      for (dba in D_ba_sens) {
+        sensitivity_mvmt <- rbind(sensitivity_mvmt, c(mab, mba, dab, dba))
+      }
+    }
+  }
+}
+
+# Rename columns of the data frame:
+colnames(sensitivity_mvmt) <- c('M_ab', 'M_ba', 'D_ab', 'D_ba')
+
+# View the results:
+head(sensitivity_mvmt)
+
+
 
 ```
