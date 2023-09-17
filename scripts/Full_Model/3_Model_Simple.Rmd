@@ -1,0 +1,263 @@
+---
+title: "Full Model"
+author: "Julia Lawson, UCSB"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+# I. Load Parameters
+
+```{r}
+
+x_a = 30
+k_a = 100
+r_a = 0.8
+
+x_b = 60
+k_b = 100
+r_b = 0.9
+
+# Movement Parameters
+M_ab = 0.2 # Adult movement A -> B 
+M_ba = 0.1 # Adult movement B -> A
+M_aa = 1 - M_ab
+M_bb = 1 - M_ba
+D_ab = 0.2 # Larval dispersal A -> B
+D_ba = 0.3 # Larval dispersal B -> A
+D_aa = 1 - D_ab
+D_bb = 1 - D_ba
+
+# Survival Parameters
+mu_a = 0.9
+mu_b = 0.8
+sigma_a = 0.9
+sigma_b = 1
+
+timesteps = 100
+
+# Economic Parameters
+p_a = 40
+c_a = 20
+p_b = 30
+c_b = 10
+
+# discount factor
+delta = 0.95
+
+# Adaptive parameters
+size_x_a = 12 #size of the state grid A
+size_x_b = 10 #size of B
+
+T = 20 #time horizon for backward induction
+small = 0.1
+
+x_a_grid = seq(small,k_a,length.out=size_x_a)
+x_b_grid = seq(small,k_b,length.out=size_x_b)
+
+```
+
+```{r}
+
+# Escapement Function
+e_a = function(x_a, h_a) {
+  return(x_a - h_a)
+}
+
+e_b = function(x_b, h_b) {
+  return(x_b - h_b)
+}
+
+# Harvest Function
+h_a = function(x_a, e_a) {
+  return(x_a - e_a)
+}
+
+h_b = function(x_b, e_b) {
+  return(x_b - e_b)
+}
+
+
+# Growth Function
+
+growth_a = function(e_a)
+{
+  y_a = r_a*e_a*(1-e_a/k_a)
+  return(y_a)
+}
+
+growth_b = function(e_b)
+{
+  y_b = r_b*e_b*(1-e_b/k_b)
+  return(y_b)
+}
+
+# Stock in Next Time Step
+
+next_x_a = function(e_a,e_b)
+{
+  x_a_new = mu_a*M_aa*e_a + mu_b*M_ba*e_b + sigma_a*(D_aa*growth_a(e_a) + D_ba*growth_b(e_b))
+  return(x_a_new)
+}
+
+next_x_b = function(e_a,e_b)
+{
+  x_b_new = mu_b*M_bb*e_b + mu_a*M_ab*e_a + sigma_b*(D_bb*growth_b(e_b) + D_ab*growth_a(e_a))
+  return(x_b_new)
+}
+
+# Marginal Profit Function
+
+b_a = function(p_a, c_a) {
+  return(p_a - c_a)
+}
+
+b_b = function(p_b, c_b) {
+  return(p_b - c_b)
+}
+
+# Profit function (A only)
+
+pi_a = function(x_a, e_a)
+{
+  profit_a = b_a*(x_a-e_a)
+  return(profit_a)
+}
+
+payoff = function(e_a, x_a, x_b, V)
+{
+  x_a_new = next_x_a(e_a=e_a, e_b=x_b) #e_b=x_b because B is a reserve
+  x_b_new = next_x_b(e_a=e_a, e_b=x_b) #e_b=x_b because B is a reserve
+  V_next =  bilinear(x_a_grid, x_b_grid, V, x_a_new, x_b_new)
+  negout = -(pi_a(x_a=x_a, e_a=e_a) + delta*V_next$z) 
+  return(negout)
+}
+
+```
+
+# III. Model
+
+```{r}
+# Initialize data frames for storing results
+results_so <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_star_a = numeric(), e_star_b = numeric()
+)
+
+results_non <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_hat_a = numeric(), e_hat_b = numeric()
+)
+
+results_adaptive <- tibble(
+  timestep = integer(), x_a = numeric(), x_b = numeric(), h_a = numeric(), h_b = numeric(), e_new_a = numeric(), e_new_b = numeric()
+)
+
+for(t in 1:timesteps) {
+
+  # SOLE OWNER ESCAPEMENT
+  
+  # Calculate phi_a and phi_b for e_star
+  phi_a <- (b_a(p_a,c_a)/delta - b_a(p_a,c_a)*mu_a*M_aa - b_b(p_b,c_b)*mu_a*M_ab) / 
+                   (b_a(p_a,c_a)*sigma_a*D_aa + b_b(p_b,c_b)*sigma_b*D_ab)
+  phi_b <- (b_b(p_b,c_b)/delta - b_b(p_b,c_b)*mu_b*M_bb - b_a(p_a,c_a)*mu_b*M_ba) / 
+                   (b_b(p_b,c_b)*sigma_b*D_bb + b_a(p_a,c_a)*sigma_a*D_ba)
+  
+  # Calculate e_star_a and e_star_b
+  e_star_a <- (k_a * (r_a - phi_a)) / (2 * r_a)
+  e_star_b <- (k_b * (r_b - phi_b)) / (2 * r_b)
+  
+  # Calculate harvest based on e_star
+  h_a_t = h_a(x_a, e_star_a)
+  h_b_t = h_b(x_b,e_star_b)
+  
+  # Escapement
+  e_a_t = e_a(x_a, h_a_t)
+  e_b_t = e_b(x_b, h_b_t)
+  
+  # Stocks in next time step
+  x_a_new = next_x_a(e_a_t,e_b_t)
+  x_b_new = next_x_b(e_b_t,e_a_t)
+  
+  # Save results including e_star_a and e_star_b
+  results_so <- results_so %>%
+    add_row(
+      timestep = t,
+      x_a = x_a_new,
+      x_b = x_b_new,
+      h_a = h_a_t,
+      h_b = h_b_t,
+      e_star_a = e_star_a,
+      e_star_b = e_star_b)
+    
+  # Update the stock for next iteration
+  x_a <- x_a_new
+  x_b <- x_b_new
+  
+  npv_so <- results_so %>%
+  mutate(
+    npv_a = sum(b_a(p_a,c_a) * (x_a - e_star_a) * delta^(timestep-1)),
+    npv_b = sum(b_b(p_b,c_b) * (x_b - e_star_b) * delta^(timestep-1))
+  ) %>%
+  mutate(joint_payoff = npv_a + npv_b, scenario = "sole owner") %>% 
+  select(e_star_a, e_star_b, npv_a, npv_b,joint_payoff,scenario) %>% 
+  rename(e_a = e_star_a, e_b = e_star_b) %>% 
+  distinct()
+  
+  # NON-COOPERATIVE ESCAPEMENT
+  
+  # Calculate phi_hat_a and phi_hat_b for e_hat
+  phi_hat_a <- (1/delta - mu_a*M_aa) / (sigma_a*D_aa)
+  phi_hat_b <- (1/delta - mu_b*M_bb) / (sigma_b*D_bb)
+  
+  # Calculate e_hat_a and e_hat_b
+  e_hat_a <- (k_a * (r_a - phi_hat_a)) / (2 * r_a)
+  e_hat_b <- (k_b * (r_b - phi_hat_b)) / (2 * r_b)
+  
+  # Calculate harvest based on e_hat
+  h_a_t = h_a(x_a,e_hat_a)
+  h_b_t = h_b(x_b,e_hat_b)
+  
+  # Escapement
+  e_a_t = e_a(x_a, h_a_t)
+  e_b_t = e_b(x_b, h_b_t)
+  
+  # Stocks in next time step
+  x_a_new = next_x_a(e_a_t,e_b_t)
+  x_b_new = next_x_b(e_b_t,e_a_t)
+  
+  # Save results including e_hat_a and e_hat_b
+  results_non <- results_non %>%
+    add_row(
+      timestep = t,
+      x_a = x_a_new,
+      x_b = x_b_new,
+      h_a = h_a_t,
+      h_b = h_b_t,
+      e_hat_a = e_hat_a,
+      e_hat_b = e_hat_b)
+    
+  # Update the stock
+  x_a <- x_a_new
+  x_b <- x_b_new
+  
+  npv_non <- results_non %>%
+  mutate(
+    npv_a = sum(b_a(p_a,c_a) * (x_a - e_hat_a) * delta^(timestep-1)),
+    npv_b = sum(b_b(p_b,c_b) * (x_b - e_hat_b) * delta^(timestep-1))
+  ) %>%
+  mutate(joint_payoff = npv_a + npv_b, scenario = "non-coop") %>% 
+  select(e_hat_a, e_hat_b, npv_a, npv_b,joint_payoff,scenario) %>% 
+  rename(e_a = e_hat_a, e_b = e_hat_b) %>% 
+  distinct()
+}
+
+```
+

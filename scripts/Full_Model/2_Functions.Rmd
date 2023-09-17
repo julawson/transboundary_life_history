@@ -32,13 +32,65 @@ e_b = function(x_b, h_b) {
   return(x_b - h_b)
 }
 
-## 0. Adaptive Escapement Function
+## 0. Adaptive Escapement Functions
+
+f_a = function(e_a)
+{
+  grow_a = r_a*e_a*(1-e_a/k_a)
+  return(grow_a)
+}
+
+f_b = function(e_b)
+{
+  grow_b = r_b*e_b*(1-e_b/k_b)
+  return(grow_b)
+}
+
+
+# Patch-specific population growth Patch A
+growth_a = function(e_a, k.=k_a, r.=r_a){
+  y_a = r.*e_a*(1-e_a/k.)
+  return(y_a)
+}
+# Patch-specific population growth Patch B
+growth_b = function(e_b, k.=k_b, r.=r_b){
+  y_b = r.*e_b*(1-e_b/k.)
+  return(y_b)
+}
+
+
+next_x_a = function(e_a,e_b)
+{
+  x_a_next = mu_a*M_aa*e_a + mu_b*M_ba*e_b + sigma_a*(D_aa*f_a(e_a) + D_ba*f_b(e_b))
+  return(x_a_next)
+}
+
+next_x_b = function(e_a,e_b)
+{
+  x_b_next = mu_b*M_bb*e_b + mu_a*M_ab*e_a + sigma_b*(D_bb*f_b(e_b) + D_ab*f_a(e_a))
+  return(x_b_next)
+}
 
 adaptive_e = function(x_current, x_other, k_current, k_other) {
   coefficient_current = x_current / k_current 
   coefficient_other = x_other / k_other 
   e_new = (coefficient_current * coefficient_other * x_other) + ((1 - coefficient_current) * k_current) # Escapement from focal patch influenced by how full both patches are (as indicated by coefficients), and the second part of the equation constrains the escapement to the focal patch carrying capacity (so a higher focal coefficient means less escapement because the patch is relatively full)
   return(e_new)
+}
+
+pi_a = function(x_a,e_a)
+{
+  profit_a = b_a*(x_a-e_a)
+  return(profit_a)
+}
+
+payoff = function(e_a,x_a,x_b,V)
+{
+  x_a_next = next_x_a(e_a=e_a,e_b=x_b) #e_b=x_b because B is a reserve
+  x_b_next = next_x_b(e_a=e_a,e_b=x_b) #e_b=x_b because B is a reserve
+  V_next =  bilinear(x_a_grid, x_b_grid, V, x_a_next, x_b_next)
+  negout = -(pi_a(x_a=x_a,e_a=e_a) + delta*V_next$z) 
+  return(negout)
 }
 
 ## I. Larval Growth
