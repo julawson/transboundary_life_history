@@ -13,6 +13,8 @@ library(here)
 library(knitr)
 library(stargazer)
 library(reshape2)
+library(cowplot)
+library(akima)
 ```
 
 # I. Load Parameters
@@ -129,7 +131,7 @@ b_b = function(p_b, c_b) {
 
 pi_a = function(x_a, e_a)
 {
-  profit_a = b_a*(x_a-e_a)
+  profit_a = b_a(p_a, c_a)*(x_a-e_a)
   return(profit_a)
 }
 
@@ -176,7 +178,7 @@ for(t in 1:timesteps) {
   
   # Calculate harvest based on e_star
   h_a_t = h_a(x_a, e_star_a)
-  h_b_t = h_b(x_b,e_star_b)
+  h_b_t = h_b(x_b, e_star_b)
   
   # Escapement
   e_a_t = e_a(x_a, h_a_t)
@@ -222,16 +224,16 @@ for(t in 1:timesteps) {
   e_hat_b <- (k_b * (r_b - phi_hat_b)) / (2 * r_b)
   
   # Calculate harvest based on e_hat
-  h_a_t = h_a(x_a,e_hat_a)
-  h_b_t = h_b(x_b,e_hat_b)
+  h_a_t = h_a(x_a, e_hat_a)
+  h_b_t = h_b(x_b, e_hat_b)
   
   # Escapement
   e_a_t = e_a(x_a, h_a_t)
   e_b_t = e_b(x_b, h_b_t)
   
   # Stocks in next time step
-  x_a_new = next_x_a(e_a_t,e_b_t)
-  x_b_new = next_x_b(e_b_t,e_a_t)
+  x_a_new = next_x_a(e_a_t, e_b_t)
+  x_b_new = next_x_b(e_a_t, e_b_t)
   
   # Save results including e_hat_a and e_hat_b
   results_non <- results_non %>%
@@ -257,6 +259,37 @@ for(t in 1:timesteps) {
   select(e_hat_a, e_hat_b, npv_a, npv_b,joint_payoff,scenario) %>% 
   rename(e_a = e_hat_a, e_b = e_hat_b) %>% 
   distinct()
+  
+  # ADAPTIVE ESCAPEMENT
+  
+df_all = data.frame()
+V_next = matrix(0,size_x_a,size_x_b)
+V = matrix(0,size_x_a,size_x_b)
+
+for(t in T:1)
+{
+  
+  for(i in 1:size_x_a)
+  {
+    x_a = x_a_grid[i]
+    for(j in 1:size_x_b)
+    {
+      x_b = x_b_grid[j]
+      guess = x_a/2
+      low = 0 #lower bound on escapement in A
+      high = x_a #upper bound on escapement in A
+      Thing = optim(par=guess, fn=payoff, lower=low, upper=high, x_a=x_a, x_b=x_b, V=V, method='L-BFGS-B')
+      e_a_star = Thing$par
+      V_star = -Thing$value
+      V_next[i,j] = V_star
+      df_now = data.frame(time=t, x_a=x_a, x_b=x_b, e_a_star=e_a_star, V_star=V_star)
+      df_all = bind_rows(df_all,df_now)
+    }
+  }
+  V = V_next
+}
+
+df_inf = df_all %>% filter(time==1)
 }
 
 ```
