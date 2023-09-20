@@ -1,5 +1,5 @@
 ---
-title: "Full Model 2"
+title: "Growth Sensitivity"
 author: "Julia Lawson, UCSB"
 date: "2023-09-19"
 output: html_document
@@ -16,6 +16,7 @@ library(reshape2)
 library(cowplot)
 library(akima)
 ```
+
 
 # I. Load Parameters
 
@@ -192,6 +193,8 @@ payoff = function(e_a, x_a, x_b, V)
 
 initialize_df <- function() {
   tibble(
+    r_a = numeric(),
+    r_b = numeric(),
     x_a = numeric(),
     x_b = numeric(),
     e_star_a = numeric(),
@@ -206,6 +209,10 @@ initialize_df <- function() {
 }
 
 results <- initialize_df()
+
+# Loop over r_a and r_b values
+for(r_a in seq(0.3, 0.7, 0.1)) {
+  for(r_b in seq(0.3, 0.7, 0.1)) {
 
 # Grid search over x_a_grid and x_b_grid
 for(i in seq_along(x_a_grid)) {
@@ -226,6 +233,8 @@ for(i in seq_along(x_a_grid)) {
     # Add the results to the dataframe
     results <- results %>%
       add_row(
+        r_a = r_a,
+        r_b = r_b,
         x_a = x_a_grid[i],
         x_b = x_b_grid[j],
         e_star_a = e_star_values$e_star_a,
@@ -237,7 +246,6 @@ for(i in seq_along(x_a_grid)) {
         npv_a_hat = npv_a_hat_total,
         npv_b_hat = npv_b_hat_total
       )
-    
   }
 }
 
@@ -264,21 +272,19 @@ for(t in T:1) {
   }
   V = V_next
 }
+  }
+  }
 
+    
 df_inf = df_all %>% filter(time==1) %>% select(-time)
 
 # Merging e_a_star values from df_inf into results based on x_a and x_b
 results <- left_join(results, df_inf) %>% 
-  select(x_a, x_b, e_star_a, e_star_b, e_hat_a, e_hat_b, e_a_star, npv_a_star, npv_b_star, npv_a_hat, npv_b_hat, V_star) %>% 
+  select(r_a, r_b, x_a, x_b, e_star_a, e_star_b, e_hat_a, e_hat_b, e_a_star, npv_a_star, npv_b_star, npv_a_hat, npv_b_hat, V_star) %>% 
   mutate(WTP_A = npv_a_hat-V_star,
          WTA_B = npv_b_hat)
 
-# Print results
-print(results)
-
 ```
-
-# V. Calculate Willingness-to-Pay and Willingness-to-Accept
 
 ```{r}
 
@@ -286,22 +292,14 @@ print(results)
 
 results_filter = results %>% 
   filter(WTP_A > 0) %>% 
-  filter(WTA_B > 0) %>%
+  filter(WTA_B > 0) %>% 
   mutate(accept = WTP_A-WTA_B) %>% 
   filter(accept > 0)
 
-# In what scenarios would an agreement be reached
+for_graph = results_filter %>% 
+  select(r_a, r_b, WTP_A, WTA_B)
 
-results_graph = results_filter %>% mutate(Color = ifelse(accept > 0, "purple", "red")) %>%
-  ggplot(aes(x = x_a, y= x_b, color = Color))+
-  geom_point()+
-  scale_color_identity() +
-  theme_bw() +
-  geom_abline(slope=1, linetype="dashed", color="red")
-
-results_graph # Agreement acceptance is in purple
+ggplot(for_graph, aes(x=WTP_A, y=WTA_B, color=r_a)) +
+  geom_point()
 
 ```
-
-
-
