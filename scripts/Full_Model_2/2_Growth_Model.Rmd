@@ -302,4 +302,8 @@ for_graph = results_filter %>%
 ggplot(for_graph, aes(x=WTP_A, y=WTA_B, color=r_a)) +
   geom_point()
 
+
+
 ```
+
+

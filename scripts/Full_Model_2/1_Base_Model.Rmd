@@ -30,11 +30,11 @@ k_b = 100
 r_b = 0.8
 
 # Movement Parameters
-M_ab = 0.2 # Adult movement A -> B 
+M_ab = 0.8 # Adult movement A -> B 
 M_ba = 0.1 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.2 # Larval dispersal A -> B
+D_ab = 0.7 # Larval dispersal A -> B
 D_ba = 0.3 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
@@ -43,7 +43,7 @@ D_bb = 1 - D_ba
 mu_a = 0.9
 mu_b = 0.9
 sigma_a = 0.9
-sigma_b = 9
+sigma_b = 0.9
 
 timesteps = 100
 
@@ -57,8 +57,8 @@ c_b = 20
 delta = 0.95
 
 # Adaptive parameters
-size_x_a = 12 #size of the state grid A
-size_x_b = 12 #size of B
+size_x_a = 10 #size of the state grid A
+size_x_b = 10 #size of B
 
 T = 20 #time horizon for backward induction
 small = 0.1
@@ -276,6 +276,16 @@ results <- left_join(results, df_inf) %>%
 # Print results
 print(results)
 
+# Prepare results for export and graphing
+results_evals = results %>%
+  mutate(accept = WTP_A-WTA_B >= 0)
+  #filter(WTP_A > 0) %>% 
+  #filter(WTA_B > 0) %>%
+  #mutate(accept = WTP_A-WTA_B) %>% 
+  #filter(accept > 0)
+
+write.csv(results_evals,here("data","inputs","e_vals.csv"), row.names=FALSE)
+
 ```
 
 # V. Calculate Willingness-to-Pay and Willingness-to-Accept
@@ -287,19 +297,35 @@ print(results)
 results_filter = results %>% 
   filter(WTP_A > 0) %>% 
   filter(WTA_B > 0) %>%
-  mutate(accept = WTP_A-WTA_B) %>% 
-  filter(accept > 0)
+  mutate(accept = WTP_A-WTA_B) # Positive values are accepted
 
-# In what scenarios would an agreement be reached
+# In what scenarios would an agreement be reached (purple)
 
 results_graph = results_filter %>% mutate(Color = ifelse(accept > 0, "purple", "red")) %>%
   ggplot(aes(x = x_a, y= x_b, color = Color))+
+  geom_abline(slope=1, linetype="dashed", color="red") +
   geom_point()+
   scale_color_identity() +
-  theme_bw() +
-  geom_abline(slope=1, linetype="dashed", color="red")
+  theme_bw() 
+  
+results_graph # Agreement acceptance is in purple, red is no agreement.
 
-results_graph # Agreement acceptance is in purple
+# Other exploratory plots
+
+a <- ggplot(data=results) +
+  geom_line(aes(x=x_a,y=e_a_star,color=factor(x_b)),linewidth=1.3) +
+  theme_bw() 
+a
+
+b <- ggplot(data=results) +
+  geom_line(aes(x=x_b,y=e_a_star,color=factor(x_a)),linewidth=1.3) +
+  theme_bw() 
+b
+
+pv <- ggplot(data=results) +
+  geom_line(aes(x=x_a,y=V_star,color=factor(x_b)),linewidth=1.3) +
+  theme_bw() 
+pv
 
 ```
 

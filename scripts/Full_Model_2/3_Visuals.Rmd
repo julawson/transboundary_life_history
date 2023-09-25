@@ -1,0 +1,69 @@
+---
+title: "Visuals"
+author: "Julia Lawson, UCSB"
+date: "2023-09-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(knitr)
+library(stargazer)
+library(reshape2)
+```
+
+
+# I. Load Parameters
+
+#II. Load Functions
+
+#III. Grow Patches
+
+```{r}
+
+result1 = data.frame(x_a = seq(1,k_a), x_b = seq(1,k_b), h_a = 0, h_b = 0) %>%
+  mutate(y_a = growth_a(e_a(x_b,h_b))) %>% 
+  mutate(y_b = growth_b(e_b(x_b,h_b))) %>% 
+  mutate(x_a_new = next_x_a(e_a(x_a,h_a),e_b(x_b,h_b))) %>% 
+  mutate(x_b_new = next_x_b(e_b(x_b,h_b),e_a(x_a,h_a)))
+
+```
+
+#IV. Import escapement values and results for agreement acceptance
+
+```{r}
+
+evals = read.csv(here("data","inputs","e_vals.csv")) 
+
+```
+
+```{r plots}
+
+# Results for Patch A, because there is no adaptive escapement for B (B is closed)
+
+for_graph = result1
+
+plot_a = ggplot() +
+  theme_bw() +
+  annotate("rect", xmin = evals$e_hat_a, xmax = 100, ymin = 0, ymax = 80,
+           alpha = 0.1, fill = "#FAFAFA") +
+  geom_line(data=for_graph, aes(x = x_a, y = x_a_new)) +
+  geom_point(data=evals, aes(x=x_a, y=e_a_star, size = ifelse(accept == "TRUE", 1, 3), color=factor(x_b))) +
+  geom_line(data=evals, aes(x=x_a, y=e_a_star, group=factor(x_b), color=factor(x_b))) +
+  scale_size_identity() +
+  geom_abline(slope=1, linetype="dashed", color="red") +
+  geom_vline(data=evals, aes(xintercept=e_star_a), linetype="dashed", color="purple") +
+  geom_vline(data=evals, aes(xintercept=e_hat_a), linetype="dashed", color="blue") +
+  guides(color=guide_legend(title="Patch B Size (x_b)")) +
+  xlab("Patch A Size (x_a)") + ylab("Patch A Size (x_a_t+1)")
+
+plot_a
+
+# Now adding in the side payment information.
+
+
+
+```
