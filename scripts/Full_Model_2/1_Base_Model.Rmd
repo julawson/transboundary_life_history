@@ -23,27 +23,27 @@ library(akima)
 
 x_a = 60
 k_a = 100
-r_a = 0.8
+r_a = 0.6
 
 x_b = 60
 k_b = 100
-r_b = 0.8
+r_b = 0.6
 
 # Movement Parameters
-M_ab = 0.8 # Adult movement A -> B 
-M_ba = 0.1 # Adult movement B -> A
+M_ab = 0.3 # Adult movement A -> B 
+M_ba = 0.5 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.7 # Larval dispersal A -> B
-D_ba = 0.3 # Larval dispersal B -> A
+D_ab = 0.4 # Larval dispersal A -> B
+D_ba = 0.5 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
 # Survival Parameters
-mu_a = 0.9
-mu_b = 0.9
-sigma_a = 0.9
-sigma_b = 0.9
+mu_a = 1
+mu_b = 1
+sigma_a = 1
+sigma_b = 1
 
 timesteps = 100
 
@@ -57,8 +57,8 @@ c_b = 20
 delta = 0.95
 
 # Adaptive parameters
-size_x_a = 10 #size of the state grid A
-size_x_b = 10 #size of B
+size_x_a = 20 #size of the state grid A
+size_x_b = 20 #size of B
 
 T = 20 #time horizon for backward induction
 small = 0.1
@@ -297,7 +297,11 @@ write.csv(results_evals,here("data","inputs","e_vals.csv"), row.names=FALSE)
 results_filter = results %>% 
   filter(WTP_A > 0) %>% 
   filter(WTA_B > 0) %>%
-  mutate(accept = WTP_A-WTA_B) # Positive values are accepted
+  mutate(accept = WTP_A-WTA_B) %>% 
+  mutate(accept = ifelse(e_a_star == 0, NA, WTP_A-WTA_B)) %>% # Positive values are accepted, restriction added so that if e_a_star is 0, there is no agreement.
+  slice_max(accept) # Filtering for highest acceptance
+  #filter(accept >= 1) #%>% 
+  #count()
 
 # In what scenarios would an agreement be reached (purple)
 
@@ -309,6 +313,25 @@ results_graph = results_filter %>% mutate(Color = ifelse(accept > 0, "purple", "
   theme_bw() 
   
 results_graph # Agreement acceptance is in purple, red is no agreement.
+
+# Creating heatmap with geom_tile based on 'accept' variable
+results_graph2 <- results_filter %>%
+  ggplot(aes(x = x_a, y = x_b, fill = accept)) + 
+  geom_tile() + 
+  scale_fill_gradient2(low = "red", high = "purple", mid = "white", 
+                       midpoint = 0, limit = c(min(results_filter$accept, na.rm = TRUE), 
+                                               max(results_filter$accept, na.rm = TRUE))) + 
+  #ggtitle("Low Adult Movement (20%), Low Larval Dispersal (10%)") +
+  theme_minimal() +
+  labs(fill = "Net Agreement \nAcceptance ($)") +
+  theme_bw() +
+  xlim(c(0,100)) +
+  ylim(c(0,100))
+
+# Print results
+print(results_graph2)
+
+#ggsave(here("visuals","high_mvmt_low_dispersal_20.jpg"))
 
 # Other exploratory plots
 

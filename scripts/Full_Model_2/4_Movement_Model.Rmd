@@ -1,5 +1,5 @@
 ---
-title: "Growth Sensitivity"
+title: "Movement Sensitivity"
 author: "Julia Lawson, UCSB"
 date: "2023-09-19"
 output: html_document
@@ -17,34 +17,33 @@ library(cowplot)
 library(akima)
 ```
 
-
 # I. Load Parameters
 
 ```{r}
 
 x_a = 60
 k_a = 100
-r_a = 0.8
+r_a = 0.6
 
 x_b = 60
 k_b = 100
-r_b = 0.8
+r_b = 0.6
 
 # Movement Parameters
-M_ab = 0.9 # Adult movement A -> B 
-M_ba = 0.9 # Adult movement B -> A
+M_ab = 0.3 # Adult movement A -> B 
+M_ba = 0.5 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
-D_ab = 0.2 # Larval dispersal A -> B
-D_ba = 0.2 # Larval dispersal B -> A
+D_ab = 0.4 # Larval dispersal A -> B
+D_ba = 0.5 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 
 # Survival Parameters
-mu_a = 0.9
-mu_b = 0.9
-sigma_a = 0.9
-sigma_b = 9
+mu_a = 1
+mu_b = 1
+sigma_a = 1
+sigma_b = 1
 
 timesteps = 100
 
@@ -58,8 +57,8 @@ c_b = 20
 delta = 0.95
 
 # Adaptive parameters
-size_x_a = 12 #size of the state grid A
-size_x_b = 12 #size of B
+size_x_a = 20 #size of the state grid A
+size_x_b = 20 #size of B
 
 T = 20 #time horizon for backward induction
 small = 0.1
@@ -191,10 +190,13 @@ payoff = function(e_a, x_a, x_b, V)
 
 ```{r}
 
+
 initialize_df <- function() {
   tibble(
-    r_a = numeric(),
-    r_b = numeric(),
+    M_ab = numeric(),
+    M_ba = numeric(),
+    D_ab = numeric(),
+    D_ba = numeric(),
     x_a = numeric(),
     x_b = numeric(),
     e_star_a = numeric(),
@@ -208,11 +210,30 @@ initialize_df <- function() {
   )
 }
 
-results <- initialize_df()
+max_accept_values <- data.frame(
+  M_ab=numeric(),
+  M_ba=numeric(),
+  D_ab=numeric(),
+  D_ba=numeric(),
+  max_accept=numeric()
+)
 
-# Loop over r_a and r_b values
-for(r_a in seq(0.3, 0.7, 0.1)) {
-  for(r_b in seq(0.3, 0.7, 0.1)) {
+
+max_accept_df <- data.frame(M_ab = numeric(), M_ba = numeric(), D_ab = numeric(), D_ba = numeric(), max_accept = numeric())
+
+
+for(M_ab in seq(0.3, 0.5, by = 0.1)) {
+  for(M_ba in seq(0.5, 0.5, by = 0.1)) {
+    for(D_ab in seq(0.3, 0.5, by = 0.1)) {
+      for(D_ba in seq(0.5, 0.5, by = 0.1)) {
+      
+      results <- initialize_df()
+        
+        # Recalculate dependent variables
+        M_aa = 1 - M_ab
+        M_bb = 1 - M_ba
+        D_aa = 1 - D_ab
+        D_bb = 1 - D_ba
 
 # Grid search over x_a_grid and x_b_grid
 for(i in seq_along(x_a_grid)) {
@@ -220,7 +241,7 @@ for(i in seq_along(x_a_grid)) {
     
     # Sole owner escapement calculation
     e_star_values <- compute_e_star(p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c_b, mu_b, M_ab, M_ba, sigma_b, D_ab, D_ba, delta)
-    
+        
     # Non-cooperative escapement calculation
     e_hat_values <- compute_e_hat(mu_a, M_aa, sigma_a, D_aa, k_a, r_a, mu_b, M_bb, sigma_b, D_bb, k_b, r_b, delta)
     
@@ -230,22 +251,24 @@ for(i in seq_along(x_a_grid)) {
     npv_a_hat_total <- sum(sapply(1:100, function(t) b_a(p_a, c_a) * (x_a_grid[i] - e_hat_values$e_hat_a) * delta^(t-1)))
     npv_b_hat_total <- sum(sapply(1:100, function(t) b_b(p_b, c_b) * (x_b_grid[j] - e_hat_values$e_hat_b) * delta^(t-1)))
 
-    # Add the results to the dataframe
-    results <- results %>%
-      add_row(
-        r_a = r_a,
-        r_b = r_b,
-        x_a = x_a_grid[i],
-        x_b = x_b_grid[j],
-        e_star_a = e_star_values$e_star_a,
-        e_star_b = e_star_values$e_star_b,
-        e_hat_a = e_hat_values$e_hat_a,
-        e_hat_b = e_hat_values$e_hat_b,
-        npv_a_star = npv_a_star_total,
-        npv_b_star = npv_b_star_total,
-        npv_a_hat = npv_a_hat_total,
-        npv_b_hat = npv_b_hat_total
-      )
+    # Adding the current M_ab and D_ab to the results data frame.
+        results <- results %>%
+          add_row(
+            x_a = x_a_grid[i],
+            x_b = x_b_grid[j],
+            M_ab = M_ab,
+            M_ba = M_ba,
+            D_ab = D_ab,
+            D_ba = D_ba,
+            e_star_a = e_star_values$e_star_a,
+            e_star_b = e_star_values$e_star_b,
+            e_hat_a = e_hat_values$e_hat_a,
+            e_hat_b = e_hat_values$e_hat_b,
+            npv_a_star = npv_a_star_total,
+            npv_b_star = npv_b_star_total,
+            npv_a_hat = npv_a_hat_total,
+            npv_b_hat = npv_b_hat_total
+            )
   }
 }
 
@@ -272,36 +295,30 @@ for(t in T:1) {
   }
   V = V_next
 }
-  }
-  }
-
+        
+# Merging calculated values into results dataframe for calculating accept
+    df_inf = df_all %>% filter(time == 1) %>% select(-time)
     
-df_inf = df_all %>% filter(time==1) %>% select(-time)
+    results <- left_join(results, df_inf)  %>% 
+      select(x_a, x_b, e_star_a, e_star_b, e_hat_a, e_hat_b, e_a_star, npv_a_star, npv_b_star, npv_a_hat, npv_b_hat, V_star) %>% 
+      mutate(WTP_A = npv_a_hat - V_star, 
+             WTA_B = npv_b_hat) 
 
-# Merging e_a_star values from df_inf into results based on x_a and x_b
-results <- left_join(results, df_inf) %>% 
-  select(r_a, r_b, x_a, x_b, e_star_a, e_star_b, e_hat_a, e_hat_b, e_a_star, npv_a_star, npv_b_star, npv_a_hat, npv_b_hat, V_star) %>% 
-  mutate(WTP_A = npv_a_hat-V_star,
-         WTA_B = npv_b_hat)
+    # Calculating and appending max_accept value
+    max_accept <- results %>%
+      filter(WTP_A > 0) %>% filter(WTA_B > 0) %>%
+      mutate(accept = WTP_A-WTA_B) %>%
+      mutate(accept = ifelse(e_a_star == 0, NA, WTP_A - WTA_B)) %>%
+      slice_max(accept)
+    
+    max_accept_df <- rbind(max_accept_df, data.frame(M_ab = M_ab, M_ba = M_ba, D_ab = D_ab, D_ba = D_ba, max_accept = max_accept))
 
-```
+    }
+    }
+  }
+}
 
-```{r}
-
-# How many scenarios would both accept the agreement (WTP_A-WTA_B is positive)
-
-results_filter = results %>% 
-  filter(WTP_A > 0) %>% 
-  filter(WTA_B > 0) %>% 
-  mutate(accept = WTP_A-WTA_B) %>% 
-  filter(accept > 0)
-
-for_graph = results_filter %>% 
-  select(r_a, r_b, WTP_A, WTA_B, accept)
-
-ggplot(for_graph, aes(x=r_a, y=r_b, color=accept)) +
-  geom_point()
-
+print(max_accept_df)
 
 
 ```
