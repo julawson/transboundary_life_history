@@ -57,10 +57,10 @@ c_b = 20
 delta = 0.95
 
 # Adaptive parameters
-size_x_a = 20 #size of the state grid A
-size_x_b = 20 #size of B
+size_x_a = 10 #size of the state grid A
+size_x_b = 10 #size of B
 
-T = 20 #time horizon for backward induction
+T = 100 #time horizon for backward induction
 small = 0.1
 
 x_a_grid = seq(small,k_a,length.out=size_x_a)
@@ -138,7 +138,7 @@ b_b = function(p_b, c_b) {
 
 # Sole Owner Scenario
 
-compute_e_star <- function(p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c_b, mu_b, M_ab, M_ba, sigma_b, D_ab, D_ba, delta) {
+compute_e_star <- function(x_a, x_b, p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c_b, mu_b, M_ab, M_ba, sigma_b, D_ab, D_ba, delta) {
   
   phi_a <- (b_a(p_a, c_a) / delta - b_a(p_a, c_a) * mu_a * M_aa - b_b(p_b, c_b) * mu_a * M_ab) / 
            (b_a(p_a, c_a) * sigma_a * D_aa + b_b(p_b, c_b) * sigma_b * D_ab)
@@ -146,21 +146,21 @@ compute_e_star <- function(p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c
   phi_b <- (b_b(p_b, c_b) / delta - b_b(p_b, c_b) * mu_b * M_bb - b_a(p_a, c_a) * mu_b * M_ba) / 
            (b_b(p_b, c_b) * sigma_b * D_bb + b_a(p_a, c_a) * sigma_a * D_ba)
   
-  e_star_a <- (k_a * (r_a - phi_a)) / (2 * r_a)
-  e_star_b <- (k_b * (r_b - phi_b)) / (2 * r_b)
+  e_star_a <- min(max((k_a * (r_a - phi_a)) / (2 * r_a), 0), x_a)
+  e_star_b <- min(max((k_b * (r_b - phi_b)) / (2 * r_b), 0), x_b)
   
   return(list(e_star_a = e_star_a, e_star_b = e_star_b))
 }
 
 # Non-cooperative Scenario
 
-compute_e_hat <- function(mu_a, M_aa, sigma_a, D_aa, k_a, r_a, mu_b, M_bb, sigma_b, D_bb, k_b, r_b, delta) {
+compute_e_hat <- function(x_a, x_b, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, mu_b, M_bb, sigma_b, D_bb, k_b, r_b, delta) {
   
   phi_hat_a <- (1 / delta - mu_a * M_aa) / (sigma_a * D_aa)
   phi_hat_b <- (1 / delta - mu_b * M_bb) / (sigma_b * D_bb)
   
-  e_hat_a <- (k_a * (r_a - phi_hat_a)) / (2 * r_a)
-  e_hat_b <- (k_b * (r_b - phi_hat_b)) / (2 * r_b)
+  e_hat_a <- min(max((k_a * (r_a - phi_hat_a)) / (2 * r_a), 0), x_a)
+  e_hat_b <- min(max((k_b * (r_b - phi_hat_b)) / (2 * r_b), 0), x_b)
   
   return(list(e_hat_a = e_hat_a, e_hat_b = e_hat_b))
 }
@@ -190,7 +190,6 @@ payoff = function(e_a, x_a, x_b, V)
 
 ```{r}
 
-
 initialize_df <- function() {
   tibble(
     M_ab = numeric(),
@@ -210,25 +209,25 @@ initialize_df <- function() {
   )
 }
 
-max_accept_values <- data.frame(
-  M_ab=numeric(),
-  M_ba=numeric(),
-  D_ab=numeric(),
-  D_ba=numeric(),
-  max_accept=numeric()
-)
+results <- initialize_df()
+
+#max_accept_values <- data.frame(
+#  M_ab=numeric(),
+#  M_ba=numeric(),
+#  D_ab=numeric(),
+#  D_ba=numeric(),
+#  max_accept=numeric()
+#)
 
 
-max_accept_df <- data.frame(M_ab = numeric(), M_ba = numeric(), D_ab = numeric(), D_ba = numeric(), max_accept = numeric())
+#max_accept_df <- data.frame(M_ab = numeric(), M_ba = numeric(), D_ab = numeric(), D_ba = numeric(), max_accept = numeric())
 
 
-for(M_ab in seq(0.3, 0.5, by = 0.1)) {
-  for(M_ba in seq(0.5, 0.5, by = 0.1)) {
-    for(D_ab in seq(0.3, 0.5, by = 0.1)) {
-      for(D_ba in seq(0.5, 0.5, by = 0.1)) {
+for(M_ab in seq(0, 1, by = 0.1)) {
+  for(M_ba in seq(0, 1, by = 0.1)) {
+    for(D_ab in seq(0, 1, by = 0.1)) {
+      for(D_ba in seq(0, 1, by = 0.1)) {
       
-      results <- initialize_df()
-        
         # Recalculate dependent variables
         M_aa = 1 - M_ab
         M_bb = 1 - M_ba
@@ -240,10 +239,10 @@ for(i in seq_along(x_a_grid)) {
   for(j in seq_along(x_b_grid)) {
     
     # Sole owner escapement calculation
-    e_star_values <- compute_e_star(p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c_b, mu_b, M_ab, M_ba, sigma_b, D_ab, D_ba, delta)
-        
+    e_star_values <- compute_e_star(x_a = x_a_grid[i], x_b = x_b_grid[j], p_a, c_a, mu_a, M_aa, sigma_a, D_aa, k_a, r_a, p_b, c_b, mu_b, M_ab, M_ba, sigma_b, D_ab, D_ba, delta)
+    
     # Non-cooperative escapement calculation
-    e_hat_values <- compute_e_hat(mu_a, M_aa, sigma_a, D_aa, k_a, r_a, mu_b, M_bb, sigma_b, D_bb, k_b, r_b, delta)
+    e_hat_values <- compute_e_hat(x_a = x_a_grid[i], x_b = x_b_grid[j], mu_a, M_aa, sigma_a, D_aa, k_a, r_a, mu_b, M_bb, sigma_b, D_bb, k_b, r_b, delta)
     
     # Calculate NPVs over 100 years
     npv_a_star_total <- sum(sapply(1:100, function(t) b_a(p_a, c_a) * (x_a_grid[i] - e_star_values$e_star_a) * delta^(t-1)))
@@ -299,27 +298,51 @@ for(t in T:1) {
 # Merging calculated values into results dataframe for calculating accept
     df_inf = df_all %>% filter(time == 1) %>% select(-time)
     
-    results <- left_join(results, df_inf)  %>% 
-      select(x_a, x_b, e_star_a, e_star_b, e_hat_a, e_hat_b, e_a_star, npv_a_star, npv_b_star, npv_a_hat, npv_b_hat, V_star) %>% 
-      mutate(WTP_A = npv_a_hat - V_star, 
-             WTA_B = npv_b_hat) 
+    results <- results
 
     # Calculating and appending max_accept value
-    max_accept <- results %>%
-      filter(WTP_A > 0) %>% filter(WTA_B > 0) %>%
-      mutate(accept = WTP_A-WTA_B) %>%
-      mutate(accept = ifelse(e_a_star == 0, NA, WTP_A - WTA_B)) %>%
-      slice_max(accept)
+    #max_accept <- results %>%
+      #filter(WTP_A > 0) %>% filter(WTA_B > 0) %>%
+      #mutate(accept = WTP_A-WTA_B) %>%
+      #mutate(accept = ifelse(e_a_star == 0, NA, WTP_A - WTA_B)) %>%
+      #slice_max(accept)
     
-    max_accept_df <- rbind(max_accept_df, data.frame(M_ab = M_ab, M_ba = M_ba, D_ab = D_ab, D_ba = D_ba, max_accept = max_accept))
+    #max_accept_df <- rbind(max_accept_df, data.frame(M_ab = M_ab, M_ba = M_ba, D_ab = D_ab, D_ba = D_ba, max_accept = max_accept))
 
     }
     }
   }
 }
 
-print(max_accept_df)
+#print(results)
+#print(results_filter)
 
+#source_b_max_accept_df = max_accept_df
+
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B)
+
+write.csv(results_filter, here("data","outputs","results.csv"), row.names=FALSE)
+
+
+```
+
+# Plotting Figures
+
+```{r}
+
+# Filtering for a single patch size
+#results_filter <- results %>% 
+#  filter(x_a >= 10 & x_a <= 12)
+
+for_graph <- results_filter %>%
+  ggplot(aes(x = D_ab, y = accept, color=factor(x_b))) + 
+  geom_line() +
+  theme_bw() 
+
+for_graph
 
 ```
 
