@@ -30,12 +30,12 @@ k_b = 100
 r_b = 0.6
 
 # Movement Parameters
-M_ab = 0.1 # Adult movement A -> B 
-M_ba = 0.9 # Adult movement B -> A
+M_ab = 0.5 # Adult movement A -> B 
+M_ba = 0.2 # Adult movement B -> A
 M_aa = 1 - M_ab
 M_bb = 1 - M_ba
 D_ab = 0.1 # Larval dispersal A -> B
-D_ba = 0.9 # Larval dispersal B -> A
+D_ba = 0.2 # Larval dispersal B -> A
 D_aa = 1 - D_ab
 D_bb = 1 - D_ba
 

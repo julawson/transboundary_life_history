@@ -223,7 +223,7 @@ results <- initialize_df()
 #max_accept_df <- data.frame(M_ab = numeric(), M_ba = numeric(), D_ab = numeric(), D_ba = numeric(), max_accept = numeric())
 
 
-for(M_ab in seq(0, 1, by = 0.1)) {
+for(M_ab in seq(0.4, 1, by = 0.1)) {
   for(M_ba in seq(0, 1, by = 0.1)) {
     for(D_ab in seq(0, 1, by = 0.1)) {
       for(D_ba in seq(0, 1, by = 0.1)) {
@@ -324,27 +324,11 @@ results_filter <- results %>%
              WTA_B = npv_b_hat,
              accept = WTP_A-WTA_B)
 
-write.csv(results_filter, here("data","outputs","results.csv"), row.names=FALSE)
+write.csv(results_filter, here("data","outputs","results_extend.csv"), row.names=FALSE)
 
 
 ```
 
-# Plotting Figures
 
-```{r}
-
-# Filtering for a single patch size
-results_filter <- results_filter %>% 
-  filter(x_a >= 10 & x_a <= 12) %>% 
-  filter(x_b >= 10 & x_b <= 12)
-
-for_graph <- results_filter %>%
-  ggplot(aes(x = D_ab, y = accept, color=factor(M_ab))) + 
-  geom_line() +
-  theme_bw() 
-
-for_graph
-
-```
 
 

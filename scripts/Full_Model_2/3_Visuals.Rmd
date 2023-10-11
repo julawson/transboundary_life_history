@@ -13,32 +13,194 @@ library(here)
 library(knitr)
 library(stargazer)
 library(reshape2)
+library(wesanderson)
 ```
 
-
-# I. Load Parameters
-
-#II. Load Functions
-
-#III. Grow Patches
+#I. Import model output
 
 ```{r}
 
-result1 = data.frame(x_a = seq(1,k_a), x_b = seq(1,k_b), h_a = 0, h_b = 0) %>%
-  mutate(y_a = growth_a(e_a(x_b,h_b))) %>% 
-  mutate(y_b = growth_b(e_b(x_b,h_b))) %>% 
-  mutate(x_a_new = next_x_a(e_a(x_a,h_a),e_b(x_b,h_b))) %>% 
-  mutate(x_b_new = next_x_b(e_b(x_b,h_b),e_a(x_a,h_a)))
+#evals = read.csv(here("data","inputs","e_vals.csv")) 
+
+results = read.csv(here("data","outputs","results.csv")) 
 
 ```
 
-#IV. Import escapement values and results for agreement acceptance
+# Plotting Figures
 
 ```{r}
 
-evals = read.csv(here("data","inputs","e_vals.csv")) 
+## Figure 1. Examining specific values of x_a and x_b to see how agreement formation changes.
+
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B)
+
+x_ab_grid = as.data.frame(x_a_grid) %>% 
+  rename(x_ab_grid=x_a_grid) %>% 
+  add_column(x_a_grid) %>% 
+  add_column(x_b_grid) %>% 
+  rename(x_a = x_a_grid) %>% 
+  rename(x_b = x_b_grid)
+
+results_filter <- results_filter %>%
+  filter(x_a == x_b) %>% 
+  left_join(x_ab_grid, by = c("x_a", "x_b"))
+
+# Filtering for a single patch size
+results_filter1 <- results_filter %>%
+  filter(x_ab_grid >= 55 & x_ab_grid <= 56) 
+
+results_filter2 <- results_filter %>% 
+  filter(x_ab_grid >= 22 & x_ab_grid <= 23) 
+
+results_filter3 <- results_filter %>% 
+  filter(x_ab_grid >= 44 & x_ab_grid <= 45) 
+
+results_filter_combo = bind_rows(results_filter1,results_filter2,results_filter3)
+
+# Summarize data to compute ymin and ymax for each M_ba and x_ab_grid
+ribbon_data <- results_filter_combo %>% 
+  group_by(D_ba, x_ab_grid) %>%
+  summarize(
+    ymin = min(accept, na.rm = TRUE),
+    ymax = max(accept, na.rm = TRUE)
+  )
+
+for_graph <- ggplot(data = ribbon_data) +
+  aes(x = D_ba, color=factor(x_ab_grid), fill=factor(x_ab_grid)) + 
+  geom_ribbon(aes(ymin = ymin, ymax = ymax), alpha = 0.1) +
+  theme_bw() +
+  labs(color = "Initital Stock Size", y = "Agreement Acceptance (WTP-WTA)", x = "Larval Dispersal (B to A)") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_fill_discrete(guide = "none") +
+  xlim(0,1)
+
+for_graph
+
+#ggsave(here("visuals","initialstock_Dba.jpg"))
 
 ```
+
+
+
+```{r}
+
+## Figure 2. 
+
+# Willingness to Pay
+
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B) 
+
+# Summarize data to compute ymin and ymax for each x_b
+extreme_x_b <- results_filter %>%
+  group_by(accept, WTP_A, x_a) %>%
+  summarize(min_x_b = min(x_b),
+            max_x_b = max(x_b))
+
+pal <- wes_palette("Zissou1", type = "continuous")
+
+for_graph <- ggplot(data = extreme_x_b, aes(x = accept, y = x_a), color = WTP_A) +
+  geom_ribbon(aes(ymin = min_x_b, ymax = max_x_b), alpha = 0.1) +
+  geom_point(data = extreme_x_b, aes(size = max_x_b, color = WTP_A)) +
+  theme_bw() +
+  scale_color_gradientn(colours = pal, limits = c(-15000, 20000), breaks = seq(-15000, 20000, by = 5000)) +
+  labs(x = "Agreement Acceptance (WTP-WTA)", y = "Patch A Stock Size", color = "Patch A \nWillingness-to-Pay ($)", size = "Patch B Stock Size") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_size_continuous(range = c(0.2, 10)) # Adjust the range for size
+
+for_graph
+
+#ggsave(here("visuals","patcha_wtp.jpg"))
+
+# Willingness to Accept
+
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B)
+
+# Summarize data to compute ymin and ymax for each x_a
+extreme_x_a <- results_filter %>%
+  group_by(accept, WTA_B, x_b) %>%
+  summarize(min_x_a = min(x_a),
+            max_x_a = max(x_a))
+
+pal <- wes_palette("Zissou1", type = "continuous")
+
+for_graph <- ggplot(data = extreme_x_a, aes(x = accept, y = x_b), color = WTA_B) +
+  geom_ribbon(aes(ymin = min_x_a, ymax = max_x_a), alpha = 0.1) +
+  geom_point(data = extreme_x_a, aes(size = max_x_a, color = WTA_B)) +
+  theme_bw() +
+  scale_color_gradientn(colours = pal, limits = c(-15000, 20000), breaks = seq(-15000, 20000, by = 5000)) +
+  labs(x = "Agreement Acceptance (WTP-WTA)", y = "Patch B Stock Size", color = "Patch B \nWillingness-to-Accept ($)", size = "Patch A Stock Size") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_size_continuous(range = c(0.2, 10)) # Adjust the range for size
+
+for_graph
+
+#ggsave(here("visuals","patchb_wta.jpg"))
+
+```
+
+```{r}
+
+## Figure 3.
+
+# Laval Dispersal vs. Adult Movement, Patch A
+
+# Willingness to Accept
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B)
+
+# Filtering for a single patch size
+results_filter1 <- results_filter %>%
+  filter(x_a >= 11 & x_a <= 12) %>% 
+  group_by(x_a, x_b) %>% 
+  mutate(min_WTA_B = min(WTA_B),
+         max_WTP_A = max(WTP_A)) 
+
+for_graph <- ggplot(data = results_filter, aes(x = D_ab, y = M_ab, fill = WTP_A)) +
+  theme_bw() +
+  geom_tile() +
+  scale_fill_gradientn(colours = pal) +
+  labs(x = "Larval Dispersal (A to B)", y = "Adult Movement (A to B)", color = "Patch A \nWillingness-to-Pay ($)") +
+  ylim(0,1)
+
+for_graph 
+
+
+# Laval Dispersal vs. Adult Movement, Patch B
+
+# Willingness to Accept
+results_filter <- results %>% 
+      mutate(WTP_A = V_star - npv_a_hat,
+             WTA_B = npv_b_hat,
+             accept = WTP_A-WTA_B)
+
+# Filtering for a single patch size
+results_filter1 <- results_filter %>%
+  filter(x_b >= 11 & x_b <= 12) 
+
+for_graph <- ggplot(data = results_filter, aes(x = D_ba, y = M_ba, fill = WTA_B)) +
+  theme_bw() +
+  geom_tile() +
+  scale_fill_gradientn(colours = pal) +
+  labs(x = "Larval Dispersal (B to A)", y = "Adult Movement (B to A)", color = "Patch B \nWillingness-to-Accept ($)") +
+  ylim(0,1)
+
+for_graph 
+
+
+
+```
+
 
 ```{r plots}
 
